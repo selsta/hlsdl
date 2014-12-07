@@ -65,7 +65,6 @@ int dl_file(char *url, char *name)
     return 0;
 }
 
-
 int get_source_from_url(const char *url, char **source)
 {
     CURL *curl_handle;
@@ -78,23 +77,12 @@ int get_source_from_url(const char *url, char **source)
     chunk.memory = malloc(1);  /* will be grown as needed by the realloc above */
     chunk.size = 0;    /* no data at this point */
     
-    /* init the curl session */
     curl_handle = curl_easy_init();
-    
-    /* specify URL to get */
     curl_easy_setopt(curl_handle, CURLOPT_URL, url);
-    
-    /* send all data to this function  */
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    
-    /* we pass our 'chunk' struct to the callback function */
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    
-    /* some servers don't like requests that are made without a user-agent
-     field, so we provide one */
     curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36");
     
-    /* get it! */
     res = curl_easy_perform(curl_handle);
     
     /* check for errors */
@@ -105,11 +93,49 @@ int get_source_from_url(const char *url, char **source)
         *source = strdup(chunk.memory);
     }
     
-    /* cleanup curl stuff */
     curl_easy_cleanup(curl_handle);
     
     if(chunk.memory)
         free(chunk.memory);
 
+    return errorcode;
+}
+
+int get_hex_from_url(const char *url, char hex[])
+{
+    CURL *curl_handle;
+    CURLcode res;
+    
+    int errorcode = 0;
+    
+    struct MemoryStruct chunk;
+    
+    chunk.memory = malloc(1);  /* will be grown as needed by the realloc above */
+    chunk.size = 0;    /* no data at this point */
+    
+    curl_handle = curl_easy_init();
+    curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36");
+    
+    res = curl_easy_perform(curl_handle);
+    
+    /* check for errors */
+    if(res != CURLE_OK) {
+        fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        errorcode = 1;
+    } else {
+        int length = 0;
+        for(int i = 0; i < 16; i++) {
+            length += snprintf(hex+length, 33 , "%02x", (unsigned char)chunk.memory[i]);
+        }
+    }
+    
+    curl_easy_cleanup(curl_handle);
+    
+    if(chunk.memory)
+        free(chunk.memory);
+    
     return errorcode;
 }

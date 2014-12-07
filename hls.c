@@ -87,18 +87,15 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         }
         
         extend_url(&link_to_key, me->url);
-        free(link_to_key);
-        
-        char *content_of_key_file = malloc(33);
-        get_source_from_url(link_to_key, &content_of_key_file);
         
         char decrypt[33];
-        int length = 0;
-        for(int i = 0; i < strlen(content_of_key_file); i++) {
-            length += sprintf(decrypt+length, "%02x", (unsigned char)content_of_key_file[i]);
+        if(get_hex_from_url(link_to_key, decrypt)) {
+            free(link_to_key);
+            return 1;
         }
+        
         strcpy(me->enc_aes.key_value, decrypt);
-        free(content_of_key_file);
+        free(link_to_key);
     }
     return 0;
 }
@@ -325,9 +322,9 @@ int download_hls(struct hls_media_playlist *me)
     char txtfilepath[30];
     char systemcall[100];
     char *rndstring = get_rndstring(10);
-    sprintf(foldername, "tmp_%s", rndstring);
-    sprintf(systemcall, "mkdir %s", foldername);
-    sprintf(txtfilepath, "%s/list.txt", foldername);
+    snprintf(foldername, sizeof(foldername), "tmp_%s", rndstring);
+    snprintf(systemcall, sizeof(systemcall), "mkdir %s", foldername);
+    snprintf(txtfilepath, sizeof(txtfilepath), "%s/list.txt", foldername);
     
     system(systemcall); //make folder
     
@@ -335,7 +332,7 @@ int download_hls(struct hls_media_playlist *me)
     
     for (int i = 0; i < me->count; i++) {
         char name[30];
-        sprintf(name, "%s/%d.ts", foldername, i);
+        snprintf(name, sizeof(name), "%s/%d.ts", foldername, i);
         dl_file(me->media_segment[i].url, name);
         fprintf(txtfile, "file \'%d.ts\'\n", i);
         if (me->encryption == true) {
@@ -349,15 +346,15 @@ int download_hls(struct hls_media_playlist *me)
     }
     fclose(txtfile);
     
-    sprintf(systemcall, "ffmpeg -loglevel quiet -f concat -i %s -c copy out.ts", txtfilepath);
+    snprintf(systemcall, sizeof(systemcall), "ffmpeg -loglevel quiet -f concat -i %s -c copy out.ts", txtfilepath);
     
     system(systemcall); //ffmpeg cmnd
     
-    sprintf(systemcall, "rm -rf %s/*.ts", foldername);
+    snprintf(systemcall, sizeof(systemcall), "rm -rf %s/*.ts", foldername);
     system(systemcall); //rm ts files
-    sprintf(systemcall, "rm -rf %s/list.txt", foldername);
+    snprintf(systemcall, sizeof(systemcall), "rm -rf %s/list.txt", foldername);
     system(systemcall); //rm list
-    sprintf(systemcall, "rmdir %s/", foldername);
+    snprintf(systemcall, sizeof(systemcall), "rmdir %s/", foldername);
     system(systemcall); //rm folder
     free(rndstring);
     return 0;
