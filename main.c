@@ -31,7 +31,9 @@ int main(int argc, const char * argv[]) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
         master_playlist.url = strdup(URL);
-        handle_hls_master_playlist(&master_playlist);
+        if(handle_hls_master_playlist(&master_playlist)) {
+            return 1;
+        }
         print_hls_master_playlist(&master_playlist);
         int user_input;
         printf("Which Quality should be downloaded? ");
@@ -44,8 +46,14 @@ int main(int argc, const char * argv[]) {
     } else {
         return 1;
     }
-    handle_hls_media_playlist(&media_playlist);
-    download_hls(&media_playlist);
+    
+    if(handle_hls_media_playlist(&media_playlist)) {
+        return 1;
+    }
+    
+    if(download_hls(&media_playlist)) {
+        return 1;
+    }
     
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
