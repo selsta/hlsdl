@@ -8,7 +8,13 @@
 int main(int argc, const char * argv[]) {
     
     char URL[200];
-    strcpy(URL, argv[1]);
+    
+    if (argc >= 2) {
+        strcpy(URL, argv[1]);
+    } else {
+        fprintf(stdout, "No file passed");
+        return 0;
+    }
     
     curl_global_init(CURL_GLOBAL_ALL);
     char *hlsfile_source;
