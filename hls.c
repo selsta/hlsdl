@@ -314,7 +314,7 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
     int i;
     printf("Found %d Qualitys\n\n", ma->count);
     for(i = 0; i < ma->count; i++) {
-        printf("%d: Bandwidth: %d, Link: %s\n", i, ma->media_playlist[i].bitrate, ma->media_playlist[i].url);
+        printf("%d: Bandwidth: %d\n", i, ma->media_playlist[i].bitrate);
     }
 }
 
