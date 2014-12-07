@@ -6,20 +6,8 @@
 #include "hls.h"
 
 int main(int argc, const char * argv[]) {
-    //const char* const URL = "http://stream.gravlab.net/003119/20130506_out/Frequency_2011_21_HD.m3u8";
-    //const char* const URL = "http://stream.gravlab.net/003119/20130506_out/Frequency_2011_21_HD-110k.m3u8";
-    //const char* const URL = "http://184.72.239.149/vod/smil:bigbuckbunnyiphone.smil/index.m3u8";
-    //const char* const URL = "http://demo.unified-streaming.com/video/oceans/oceans_aes.ism/oceans_aes.m3u8";
-    //const char* const URL = "http://wpc.866f.edgecastcdn.net/03866F/greyback/yourtrinity/jw-online-giving_,2500,1500,580,265,.mp4.m3u8";
-    //const char* const URL = "http://download.oracle.com/otndocs/products/javafx/JavaRap/prog_index.m3u8";
-    //const char* const URL = "http://vas.sim-technik.de/video/playlist.m3u8?ClipID=3587262";
-    //const char* const URL = "http://cdn.theoplayer.com/video/big_buck_bunny_encrypted/stream-800/index.m3u8";
-    //const char* const URL = "http://tv4play-i.akamaihd.net/i/mp4root/2009-04-09/A1F4PXKK_WEBBMETALLICANY_737866_,T6MP43,T6MP48,_.mp4.csmil/index_1_av.m3u8?e=b471643725c47acd&";
-    //const char* const URL = "http://demo.unified-streaming.com/video/caminandes/caminandes-sample-aes.ism/caminandes-sample-aes.m3u8";
-    //const char* const URL = "http://demo.unified-streaming.com/video/caminandes/caminandes-pr-aes.ism/caminandes-pr-aes.m3u8";
     
     char URL[200];
-    
     strcpy(URL, argv[1]);
     
     curl_global_init(CURL_GLOBAL_ALL);
@@ -43,6 +31,7 @@ int main(int argc, const char * argv[]) {
         printf("Which Quality should be downloaded? ");
         scanf("%d", &user_input);
         media_playlist = master_playlist.media_playlist[user_input];
+        master_playlist_cleanup(&master_playlist);
     } else if (playlist_type == MEDIA_PLAYLIST) {
         media_playlist.bitrate = 0;
         media_playlist.url = strdup(URL);
@@ -52,7 +41,7 @@ int main(int argc, const char * argv[]) {
     handle_hls_media_playlist(&media_playlist);
     download_hls(&media_playlist);
     
-    free(hlsfile_source);
+    media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
     return 0;
 }

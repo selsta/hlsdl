@@ -361,3 +361,19 @@ int download_hls(struct hls_media_playlist *me)
     return 0;
 }
 
+void media_playlist_cleanup(struct hls_media_playlist *me)
+{
+    free(me->source);
+    free(me->url);
+    for (int i = 0; i < me->count; i++) {
+        free(me->media_segment[i].url);
+    }
+    free(me->media_segment);
+}
+
+void master_playlist_cleanup(struct hls_master_playlist *ma)
+{
+    free(ma->source);
+    free(ma->url);
+    free(ma->media_playlist);
+}
