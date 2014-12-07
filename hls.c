@@ -125,9 +125,12 @@ static int media_playlist_get_media_sequence(char *source)
     int j = 0;
     
     char *p_media_sequence = strstr(source, "#EXT-X-MEDIA-SEQUENCE:");
-    if(sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
-        fprintf(stderr, "Error reading EXT-X-MEDIA-SEQUENCE\n");
-        return 0;
+    
+    if (p_media_sequence) {
+        if(sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
+            fprintf(stderr, "Error reading EXT-X-MEDIA-SEQUENCE\n");
+            return 0;
+        }
     }
     return j;
 }
@@ -355,7 +358,7 @@ int download_hls(struct hls_media_playlist *me)
     system(systemcall); //rm ts files
     sprintf(systemcall, "rm -rf %s/list.txt", foldername);
     system(systemcall); //rm list
-    sprintf(systemcall, "rm -r %s/", foldername);
+    sprintf(systemcall, "rmdir %s/", foldername);
     system(systemcall); //rm folder
     free(rndstring);
     return 0;
