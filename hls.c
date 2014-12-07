@@ -90,7 +90,6 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         free(link_to_key);
         
         char *content_of_key_file = malloc(33);
-        printf("%s\n", link_to_key);
         get_source_from_url(link_to_key, &content_of_key_file);
         
         char decrypt[33];
