@@ -61,9 +61,16 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma);
  ****************************************************/
 int handle_hls_media_playlist(struct hls_media_playlist *me);
 
+/*****************************************************
+ * USAGE: Downloads a media playlist
+ * Return values:
+ *     0 - success
+ *     1 - error
+ ****************************************************/
 int download_hls(struct hls_media_playlist *me);
-void print_hls_master_playlist(struct hls_master_playlist *ma);
 
+
+void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
 #endif /* defined(__HLS_DownLoad__hls__) */
