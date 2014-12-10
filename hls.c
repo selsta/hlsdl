@@ -330,7 +330,11 @@ int download_hls(struct hls_media_playlist *me)
     
     txtfile = fopen(txtfilepath, "w");
     
+    printf("%d Segments found.\n", me->count);
+    
     for (int i = 0; i < me->count; i++) {
+        printf("\rDownloading Segment %d/%d", i, me->count);
+        fflush(stdout);
         char name[30];
         snprintf(name, sizeof(name), "%s/%d.ts", foldername, i);
         dl_file(me->media_segment[i].url, name);
@@ -344,6 +348,7 @@ int download_hls(struct hls_media_playlist *me)
             }
         }
     }
+    printf("\n");
     fclose(txtfile);
     
     snprintf(systemcall, sizeof(systemcall), "ffmpeg -loglevel quiet -f concat -i %s -c copy out.ts", txtfilepath);
