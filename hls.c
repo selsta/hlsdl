@@ -104,8 +104,7 @@ static int get_link_count(char *src)
 {
     int linkcount = 0;
     
-    src--;
-    do {
+    while ((src = (strchr(src, 10)))) {
         src++;
         if (*src == '#') {
             continue;
@@ -114,7 +113,7 @@ static int get_link_count(char *src)
             break;
         }
         linkcount++;
-    } while ((src = (strchr(src, 10))));
+    }
     
     return linkcount;
 }
@@ -144,10 +143,9 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
         ms[i].url = (char*)malloc(strlen(me->source));
     }
     
-    
-    char *src = me->source - 1;
+    char *src = me->source;
     for (int i = 0; i < me->count; i++) {
-        do {
+        while ((src = (strchr(src, 10)))) {
             src++;
             if (*src == 10) {
                 continue;
@@ -169,7 +167,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 }
                 break;
             }
-        } while ((src = (strchr(src, 10))));
+        }
     }
 
     /* Extend individual urls */
@@ -225,9 +223,9 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
     }
     
     /* Get urls */
-    char *src = ma->source - 1;
+    char *src = ma->source;
     for (int i = 0; i < ma->count; i++) {
-        do {
+        while ((src = (strchr(src, 10)))) {
             src++;
             if (*src == '#' || *src == 10) {
                 continue;
@@ -238,7 +236,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
             if (sscanf(src, "%[^\n]", me[i].url) == 1) {
                 break;
             }
-        } while ((src = (strchr(src, 10))));
+        }
      }
     
     /* Extend individual urls */
