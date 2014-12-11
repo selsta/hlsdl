@@ -30,11 +30,11 @@ int get_playlist_type(char *source)
         fprintf(stderr, "Not a valid M3U8 file. Exiting.\n");
         return -1;
     }
-    for (int i = 0; i < strlen(source); i++) {
-        if (!strncmp(&source[i], "#EXT-X-STREAM-INF", 17)) {
-            return 0;
-        }
+    
+    if (strstr(source, "#EXT-X-STREAM-INF")) {
+        return 0;
     }
+    
     return 1;
 }
 
