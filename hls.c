@@ -209,30 +209,18 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
 
 static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
 {
-    int j = 0;
-    
     struct hls_media_playlist *me = ma->media_playlist;
-    /* Get Individual Bitrate */
-    for (int i = 0; i < strlen(ma->source); i++) {
-        /* Check for BANDWIDTH= */
-        if(!strncmp(&ma->source[i], "BANDWIDTH=", 10) && j < ma->count) {
-            char *ascii_number = (char*)malloc(11); //length of an uint + 1
-            
-            if(sscanf(&ma->source[i], "BANDWIDTH=%[0-9]", ascii_number) != 1) {
-                fprintf(stderr, "Error finding bitrate\n");
-                return 1;
-            }
-            me[j].bitrate = atoi(ascii_number);
-            j++;
-            free(ascii_number);
-        }
-    }
     
-    if (j < ma->count) {
-        /* Set undefined bitrates to zero */
-        for (int i = j; i < ma->count; i++) {
-            me[i].bitrate = 0;
+    char *src = ma->source;
+    
+    for (int i = 0; i < ma->count; i++) {
+        if ((src = strstr(src, "BANDWIDTH="))) {
+            if ((sscanf(src, "BANDWIDTH=%u", &me[i].bitrate)) == 1) {
+                src++;
+                continue;
+            }
         }
+        me[i].bitrate = 0;
     }
     return 0;
 }
