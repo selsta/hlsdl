@@ -100,19 +100,22 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
     return 0;
 }
 
-static int get_link_count(char *source)
+static int get_link_count(char *src)
 {
     int linkcount = 0;
-    if(source) {
-        for (int i = 0; i < strlen(source); i++){
-            if (source[i] == 10    &&
-                source[i+1] != '#' &&
-                source[i+1] != 10  &&
-                source[i+1] != '\0') {
-                linkcount++;
-            }
+    
+    src--;
+    do {
+        src++;
+        if (*src == '#') {
+            continue;
         }
-    }
+        if (*src == '\0') {
+            break;
+        }
+        linkcount++;
+    } while ((src = (strchr(src, 10))));
+    
     return linkcount;
 }
 
@@ -133,11 +136,7 @@ static int media_playlist_get_media_sequence(char *source)
 
 static int media_playlist_get_links(struct hls_media_playlist *me)
 {
-    int j = 0;
-    int len = 0;
-    
     int media_squence_start_val = media_playlist_get_media_sequence(me->source);
-    
     struct hls_media_segment *ms = me->media_segment;
     
     /* Initialze the Strings */
@@ -145,46 +144,34 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
         ms[i].url = (char*)malloc(strlen(me->source));
     }
     
-    /* Get Individual Links */
-    for (int i = 0; i < strlen(me->source); i++) {
-        /* Skip this line if there is a # at the beginning */
-        if(me->source[i] == '#') {
-            parse_playlist_tag(me, &me->source[i]);
-            while(me->source[i] != 10){
-                i++;
+    
+    char *src = me->source - 1;
+    for (int i = 0; i < me->count; i++) {
+        do {
+            src++;
+            if (*src == 10) {
+                continue;
             }
-            continue;
-        }
-        
-        else if (me->source[i - 1] == 10 && me->source[i] == 10) { //skip blank line
-            continue;
-        }
-        
-        /* Write the links in a char array */
-        else {
-            if(me->source[i] != 10) {
-                len += snprintf(ms[j].url + len, strlen(me->source), "%c", me->source[i]);
+            if (*src == '#') {
+                parse_playlist_tag(me, src);
+                continue;
             }
-            else if (me->source[i] == '\0') {
-                break;
+            if (*src == '\0') {
+                return 1;
             }
-            else {
-                if (j == me->count) {
-                    fprintf(stderr, "Link overflow");
-                    return 1; //ERROR
-                }
-                ms[j].sequence_number = j + media_squence_start_val;
+            if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
+                ms[i].sequence_number = i + media_squence_start_val;
                 if (me->encryptiontype == ENC_AES128) {
-                    strcpy(ms[j].enc_aes.key_value, me->enc_aes.key_value);
+                    strcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value);
                     if (me->enc_aes.iv_is_static == false) {
-                        snprintf(ms[j].enc_aes.iv_value, 33, "%032x\n", ms[j].sequence_number);
+                        snprintf(ms[i].enc_aes.iv_value, 33, "%032x\n", ms[i].sequence_number);
                     }
                 }
-                j++;
-                len = 0;
+                break;
             }
-        }
+        } while ((src = (strchr(src, 10))));
     }
+
     /* Extend individual urls */
     for (int i = 0; i < me->count; i++) {
         extend_url(&ms[i].url, me->url);
@@ -227,53 +214,33 @@ static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
 
 static int master_playlist_get_links(struct hls_master_playlist *ma)
 {
-    
-    int j = 0;
-    int len = 0;
-    
     struct hls_media_playlist *me = ma->media_playlist;
 
     /* Initialze the Strings */
-    for(int i = 0; i < ma->count; i++) {
-        if((me[i].url = (char*)malloc(strlen(ma->source))) == NULL) {
+    for (int i = 0; i < ma->count; i++) {
+        if ((me[i].url = (char*)malloc(strlen(ma->source))) == NULL) {
             fprintf(stderr, "OUT OF MEMORY\n");
             return 1;
         }
     }
     
-    /* Get Individual Qualitys */
-    for (int i = 0; i < strlen(ma->source); i++) {
-        /* Skip this line if there is a # at the beginning */
-        if(ma->source[i] == '#') {
-            while(ma->source[i] != 10){
-                i++;
+    /* Get urls */
+    char *src = ma->source - 1;
+    for (int i = 0; i < ma->count; i++) {
+        do {
+            src++;
+            if (*src == '#' || *src == 10) {
+                continue;
             }
-            continue;
-        }
-        
-        else if (ma->source[i - 1] == 10 && ma->source[i] == 10) { //skip blank line
-            continue;
-        }
-        
-        /* Write the links in a char array */
-        else {
-            if(ma->source[i] != 10) {
-                len += snprintf(me[j].url + len, strlen(ma->source), "%c", ma->source[i]);
+            if (*src == '\0') {
+                return 1;
             }
-            else if (ma->source[i] == '\0') {
+            if (sscanf(src, "%[^\n]", me[i].url) == 1) {
                 break;
             }
-            else {
-                if (j == ma->count) {
-                    fprintf(stderr, "Link overflow");
-                    return 1; //ERROR
-                }
-                
-                j++;
-                len = 0;
-            }
-        }
-    }
+        } while ((src = (strchr(src, 10))));
+     }
+    
     /* Extend individual urls */
     for (int i = 0; i < ma->count; i++) {
         extend_url(&me[i].url, ma->url);
@@ -321,7 +288,7 @@ int download_hls(struct hls_media_playlist *me)
     printf("%d Segments found.\n", me->count);
     
     for (int i = 0; i < me->count; i++) {
-        printf("\rDownloading Segment %d/%d", i, me->count);
+        printf("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
         char name[30];
         snprintf(name, sizeof(name), "%s/%d.ts", foldername, i);
