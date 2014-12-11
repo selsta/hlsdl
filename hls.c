@@ -16,7 +16,7 @@ static char *get_rndstring(int length)
     max = length;
     
     char *generated = (char*)malloc(max + 1);
-    for(i = 0; i < max; i++) {
+    for (i = 0; i < max; i++) {
         r = rand() % strlen(letters);
         generated[i] = letters[r];
     }
@@ -31,7 +31,7 @@ int get_playlist_type(char *source)
         return -1;
     }
     for (int i = 0; i < strlen(source); i++) {
-        if(!strncmp(&source[i], "#EXT-X-STREAM-INF", 17)) {
+        if (!strncmp(&source[i], "#EXT-X-STREAM-INF", 17)) {
             return 0;
         }
     }
@@ -49,7 +49,7 @@ static int extend_url(char **url, const char *baseurl)
     else if (**url == '/') {
         char *domain = (char*)malloc(max_length);
         strcpy(domain, baseurl);
-        if(!sscanf(baseurl, "http://%[^/]", domain)) {
+        if (!sscanf(baseurl, "http://%[^/]", domain)) {
             sscanf(baseurl, "https://%[^/]", domain);
         }
         
@@ -81,7 +81,7 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
         char iv_key[33];
         
-        if(sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_key) == 2) {
+        if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_key) == 2) {
             strcpy(me->enc_aes.iv_value, iv_key);
             me->enc_aes.iv_is_static = true;
         }
@@ -89,7 +89,7 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         extend_url(&link_to_key, me->url);
         
         char decrypt[33];
-        if(get_hex_from_url(link_to_key, decrypt)) {
+        if (get_hex_from_url(link_to_key, decrypt)) {
             free(link_to_key);
             return 1;
         }
@@ -121,7 +121,6 @@ static int get_link_count(char *src)
 static int media_playlist_get_media_sequence(char *source)
 {
     int j = 0;
-    
     char *p_media_sequence = strstr(source, "#EXT-X-MEDIA-SEQUENCE:");
     
     if (p_media_sequence) {
@@ -139,7 +138,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     struct hls_media_segment *ms = me->media_segment;
     
     /* Initialze the Strings */
-    for(int i = 0; i < me->count; i++) {
+    for (int i = 0; i < me->count; i++) {
         ms[i].url = (char*)malloc(strlen(me->source));
     }
     
@@ -263,7 +262,7 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
 {
     int i;
     printf("Found %d Qualitys\n\n", ma->count);
-    for(i = 0; i < ma->count; i++) {
+    for (i = 0; i < ma->count; i++) {
         printf("%d: Bandwidth: %d\n", i, ma->media_playlist[i].bitrate);
     }
 }

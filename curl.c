@@ -15,7 +15,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
     
     mem->memory = realloc(mem->memory, mem->size + realsize + 1);
-    if(mem->memory == NULL) {
+    if (mem->memory == NULL) {
         /* out of memory! */
         printf("not enough memory (realloc returned NULL)\n");
         return 0;
@@ -54,7 +54,7 @@ int dl_file(char *url, char *name)
         res = curl_easy_perform(curl_handle);
         
         
-        if(res != CURLE_OK) {
+        if (res != CURLE_OK) {
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             errorcode = 1;
         }
@@ -86,7 +86,7 @@ int get_source_from_url(const char *url, char **source)
     res = curl_easy_perform(curl_handle);
     
     /* check for errors */
-    if(res != CURLE_OK) {
+    if (res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         errorcode = 1;
     } else {
@@ -95,8 +95,9 @@ int get_source_from_url(const char *url, char **source)
     
     curl_easy_cleanup(curl_handle);
     
-    if(chunk.memory)
+    if (chunk.memory) {
         free(chunk.memory);
+    }
 
     return errorcode;
 }
@@ -122,20 +123,21 @@ int get_hex_from_url(const char *url, char hex[])
     res = curl_easy_perform(curl_handle);
     
     /* check for errors */
-    if(res != CURLE_OK) {
+    if (res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         errorcode = 1;
     } else {
         int length = 0;
-        for(int i = 0; i < 16; i++) {
+        for (int i = 0; i < 16; i++) {
             length += snprintf(hex+length, 33 , "%02x", (unsigned char)chunk.memory[i]);
         }
     }
     
     curl_easy_cleanup(curl_handle);
     
-    if(chunk.memory)
+    if (chunk.memory) {
         free(chunk.memory);
+    }
     
     return errorcode;
 }

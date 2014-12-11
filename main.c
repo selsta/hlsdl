@@ -47,13 +47,13 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
-    if(handle_hls_media_playlist(&media_playlist)) {
+    if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }
     
     printf("Media Playlist parsed, downloading now!\n");
     
-    if(download_hls(&media_playlist)) {
+    if (download_hls(&media_playlist)) {
         return 1;
     }
     
