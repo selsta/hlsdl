@@ -1,7 +1,7 @@
 HLS-Downloader
 ==============
 
-This program converts .m3u8 playlists to .ts files.
+This program converts .m3u8 playlists to a .ts video. It supports AES-128 encryption.
 
 Requirements
 ------------
@@ -19,7 +19,8 @@ Todo
 ----
 
 - Multithreading (Only reason I've written this program)
-- Support more kinds of encryption
+- Support for SAMPLE-AES and other encryption types.
 - Verbose and error log system
 - Use of a tmpfolder
 - openssl and libavformat in program instead of sytemcall
+- Windows
