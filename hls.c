@@ -155,7 +155,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 continue;
             }
             if (*src == '\0') {
-                return 0;
+                break;
             }
             if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
                 ms[i].sequence_number = i + media_squence_start_val;
@@ -231,7 +231,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
                 continue;
             }
             if (*src == '\0') {
-                return 0;
+                break;
             }
             if (sscanf(src, "%[^\n]", me[i].url) == 1) {
                 break;
