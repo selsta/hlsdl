@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include "msg.h"
 
 struct MemoryStruct {
     char *memory;
@@ -17,7 +18,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     mem->memory = realloc(mem->memory, mem->size + realsize + 1);
     if (mem->memory == NULL) {
         /* out of memory! */
-        printf("not enough memory (realloc returned NULL)\n");
+        MSG_ERROR("not enough memory (realloc returned NULL)\n");
         return 0;
     }
     
@@ -55,7 +56,7 @@ int dl_file(char *url, char *name)
         
         
         if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+            MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             errorcode = 1;
         }
         /* always cleanup */
@@ -87,7 +88,7 @@ int get_source_from_url(const char *url, char **source)
     
     /* check for errors */
     if (res != CURLE_OK) {
-        fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         errorcode = 1;
     } else {
         *source = strdup(chunk.memory);
@@ -98,7 +99,7 @@ int get_source_from_url(const char *url, char **source)
     if (chunk.memory) {
         free(chunk.memory);
     }
-
+    
     return errorcode;
 }
 
@@ -124,7 +125,7 @@ int get_hex_from_url(const char *url, char hex[])
     
     /* check for errors */
     if (res != CURLE_OK) {
-        fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         errorcode = 1;
     } else {
         int length = 0;

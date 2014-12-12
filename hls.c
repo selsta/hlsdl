@@ -6,6 +6,7 @@
 #include <time.h>
 #include "curl.h"
 #include "hls.h"
+#include "msg.h"
 
 static char *get_rndstring(int length)
 {
@@ -27,7 +28,7 @@ static char *get_rndstring(int length)
 int get_playlist_type(char *source)
 {
     if (strncmp("#EXTM3U", source, 7) != 0) {
-        fprintf(stderr, "Not a valid M3U8 file. Exiting.\n");
+        MSG_WARNING("Not a valdif M3U8 file. Exiting.\n");
         return -1;
     }
     
@@ -68,7 +69,7 @@ static int extend_url(char **url, const char *baseurl)
         free(buffer);
         return 0;
     }
-
+    
 }
 
 static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
@@ -125,7 +126,7 @@ static int media_playlist_get_media_sequence(char *source)
     
     if (p_media_sequence) {
         if(sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
-            fprintf(stderr, "Error reading EXT-X-MEDIA-SEQUENCE\n");
+            MSG_ERROR("Could not read EXT-X-MEDIA-SEQUENCE\n");
             return 0;
         }
     }
@@ -168,7 +169,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
             }
         }
     }
-
+    
     /* Extend individual urls */
     for (int i = 0; i < me->count; i++) {
         extend_url(&ms[i].url, me->url);
@@ -184,7 +185,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     }
     me->count = get_link_count(me->source);
     me->media_segment = (struct hls_media_segment*)malloc(sizeof(struct hls_media_segment) * me->count);
-
+    
     if (media_playlist_get_links(me)) {
         return 1;
     }
@@ -212,11 +213,11 @@ static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
 static int master_playlist_get_links(struct hls_master_playlist *ma)
 {
     struct hls_media_playlist *me = ma->media_playlist;
-
+    
     /* Initialze the Strings */
     for (int i = 0; i < ma->count; i++) {
         if ((me[i].url = (char*)malloc(strlen(ma->source))) == NULL) {
-            fprintf(stderr, "OUT OF MEMORY\n");
+            MSG_ERROR("out of memory\n");
             return 1;
         }
     }
@@ -236,7 +237,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
                 break;
             }
         }
-     }
+    }
     
     /* Extend individual urls */
     for (int i = 0; i < ma->count; i++) {
@@ -261,9 +262,9 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
 void print_hls_master_playlist(struct hls_master_playlist *ma)
 {
     int i;
-    printf("Found %d Qualitys\n\n", ma->count);
+    MSG_VERBOSE("Found %d Qualitys\n\n", ma->count);
     for (i = 0; i < ma->count; i++) {
-        printf("%d: Bandwidth: %d\n", i, ma->media_playlist[i].bitrate);
+        MSG_PRINT("%d: Bandwidth: %d\n", i, ma->media_playlist[i].bitrate);
     }
 }
 
@@ -282,7 +283,7 @@ int download_hls(struct hls_media_playlist *me)
     
     txtfile = fopen(txtfilepath, "w");
     
-    printf("%d Segments found.\n", me->count);
+    MSG_VERBOSE("%d Segments found.\n", me->count);
     
     for (int i = 0; i < me->count; i++) {
         printf("\rDownloading Segment %d/%d", i + 1, me->count);
@@ -300,7 +301,7 @@ int download_hls(struct hls_media_playlist *me)
             }
         }
     }
-    printf("\n");
+    MSG_VERBOSE("\n");
     fclose(txtfile);
     
     snprintf(systemcall, sizeof(systemcall), "ffmpeg -loglevel quiet -f concat -i %s -c copy out.ts", txtfilepath);

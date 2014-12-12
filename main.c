@@ -4,6 +4,7 @@
 #include <curl/curl.h>
 #include "curl.h"
 #include "hls.h"
+#include "msg.h"
 
 int main(int argc, const char * argv[]) {
     
@@ -12,7 +13,7 @@ int main(int argc, const char * argv[]) {
     if (argc >= 2) {
         strcpy(URL, argv[1]);
     } else {
-        fprintf(stdout, "No file passed");
+        MSG_WARNING("No file passed.");
         return 0;
     }
     
@@ -21,12 +22,12 @@ int main(int argc, const char * argv[]) {
     struct hls_media_playlist media_playlist;
     
     if (get_source_from_url(URL, &hlsfile_source)) {
-        fprintf(stderr, "Error connecting to server");
+        MSG_ERROR("Connection to server failed.\n");
         return 1;
     }
     
     int playlist_type = get_playlist_type(hlsfile_source);
-
+    
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
@@ -36,7 +37,7 @@ int main(int argc, const char * argv[]) {
         }
         print_hls_master_playlist(&master_playlist);
         int user_input;
-        printf("Which Quality should be downloaded? ");
+        MSG_PRINT("Which Quality should be downloaded? ");
         scanf("%d", &user_input);
         media_playlist = master_playlist.media_playlist[user_input];
         master_playlist_cleanup(&master_playlist);
@@ -51,13 +52,13 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
-    printf("Media Playlist parsed, downloading now!\n");
+    MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
     if (download_hls(&media_playlist)) {
         return 1;
     }
     
-    printf("Downloaded out.ts to your current directory. Cleaning up.\n");
+    MSG_VERBOSE("Downloaded out.ts to your current directory. Cleaning up.\n");
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
     return 0;
