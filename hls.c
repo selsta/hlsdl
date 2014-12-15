@@ -98,6 +98,30 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         strcpy(me->enc_aes.key_value, decrypt);
         free(link_to_key);
     }
+    
+    if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
+        me->encryption = true;
+        me->encryptiontype = ENC_AES_SAMPLE;
+        me->enc_aes.iv_is_static = false;
+        
+        char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
+        char iv_key[33];
+        
+        if (sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_key) == 2) {
+            strcpy(me->enc_aes.iv_value, iv_key);
+            me->enc_aes.iv_is_static = true;
+        }
+        
+        extend_url(&link_to_key, me->url);
+        
+        char decrypt[33];
+        if (get_hex_from_url(link_to_key, decrypt)) {
+            free(link_to_key);
+            return 1;
+        }
+        strcpy(me->enc_aes.key_value, decrypt);
+        free(link_to_key);
+    }
     return 0;
 }
 
@@ -159,7 +183,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
             }
             if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
                 ms[i].sequence_number = i + media_squence_start_val;
-                if (me->encryptiontype == ENC_AES128) {
+                if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     strcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value);
                     if (me->enc_aes.iv_is_static == false) {
                         snprintf(ms[i].enc_aes.iv_value, 33, "%032x\n", ms[i].sequence_number);
@@ -297,6 +321,8 @@ int download_hls(struct hls_media_playlist *me)
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
                 char opensslcall[300];
+                MSG_PRINT("openssl aes-128-cbc -d -in %s -out %s/tmp_file -K %s -iv %s ; mv %s/tmp_file %s\n", name, foldername,
+                          me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value, foldername, name);
                 snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in %s -out %s/tmp_file -K %s -iv %s ; mv %s/tmp_file %s",
                          name, foldername, me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value, foldername, name);
                 system(opensslcall);

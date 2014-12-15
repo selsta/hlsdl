@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#define ENC_AES_SAMPLE 0x02
 #define ENC_AES128 0x01
 #define ENC_NONE 0x00
 

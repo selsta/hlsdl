@@ -52,6 +52,11 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
+    if (media_playlist.encryptiontype == ENC_AES_SAMPLE) {
+        MSG_WARNING("SAMPLE-AES Encryption is not supported yet. Exiting.\n");
+        return 0;
+    }
+    
     MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
     if (download_hls(&media_playlist)) {
