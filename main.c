@@ -7,7 +7,7 @@
 #include "msg.h"
 
 int main(int argc, const char * argv[]) {
-    char URL[200];
+    char URL[500];
     int file_passed = 0;
     
     loglevel = 0;

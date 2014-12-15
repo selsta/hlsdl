@@ -28,7 +28,7 @@ static char *get_rndstring(int length)
 int get_playlist_type(char *source)
 {
     if (strncmp("#EXTM3U", source, 7) != 0) {
-        MSG_WARNING("Not a valdif M3U8 file. Exiting.\n");
+        MSG_WARNING("Not a valid M3U8 file. Exiting.\n");
         return -1;
     }
     
@@ -56,6 +56,11 @@ static int extend_url(char **url, const char *baseurl)
         
         char *buffer = (char*)malloc(max_length);
         snprintf(buffer, max_length, "%s%s", domain, *url);
+        *url = realloc(*url, strlen(buffer) + 1);
+        if (!*url) {
+            MSG_ERROR("out of memory");
+            exit(1);
+        }
         strcpy(*url, buffer);
         free(buffer);
         free(domain);
@@ -65,11 +70,15 @@ static int extend_url(char **url, const char *baseurl)
     else {
         char *buffer = (char*)malloc(max_length);
         snprintf(buffer, max_length, "%s/../%s", baseurl, *url);
+        *url = realloc(*url, strlen(buffer) + 1);
+        if (!*url) {
+            MSG_ERROR("out of memory");
+            exit(1);
+        }
         strcpy(*url, buffer);
         free(buffer);
         return 0;
     }
-    
 }
 
 static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
@@ -194,7 +203,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
         }
     }
     
-finish:
+    finish:
     /* Extend individual urls */
     for (int i = 0; i < me->count; i++) {
         extend_url(&ms[i].url, me->url);
@@ -264,7 +273,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
         }
     }
     
-finish:
+    finish:
     /* Extend individual urls */
     for (int i = 0; i < ma->count; i++) {
         extend_url(&me[i].url, ma->url);
@@ -321,8 +330,6 @@ int download_hls(struct hls_media_playlist *me)
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
                 char opensslcall[300];
-                MSG_PRINT("openssl aes-128-cbc -d -in %s -out %s/tmp_file -K %s -iv %s ; mv %s/tmp_file %s\n", name, foldername,
-                          me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value, foldername, name);
                 snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in %s -out %s/tmp_file -K %s -iv %s ; mv %s/tmp_file %s",
                          name, foldername, me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value, foldername, name);
                 system(opensslcall);
