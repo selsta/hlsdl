@@ -16,7 +16,7 @@
 #define MSG_DBG(...) msg_print_va(LVL_DBG, __VA_ARGS__)
 #define MSG_PRINT(...) msg_print_va(LVL_PRINT, __VA_ARGS__)
 
-static int loglevel;
+int loglevel;
 
 int msg_print_va(int lvl, char *fmt, ...);
 
