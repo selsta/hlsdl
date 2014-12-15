@@ -7,13 +7,23 @@
 #include "msg.h"
 
 int main(int argc, const char * argv[]) {
-    
     char URL[200];
+    int file_passed = 0;
     
-    if (argc >= 2) {
-        strcpy(URL, argv[1]);
-    } else {
-        MSG_WARNING("No file passed.");
+    loglevel = 0;
+    
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
+            loglevel++;
+        }
+        else {
+            strcpy(URL, argv[i]);
+            file_passed++;
+        }
+    }
+    
+    if (file_passed != 1) {
+        MSG_WARNING("No files passed. Exiting.\n");
         return 0;
     }
     

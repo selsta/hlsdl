@@ -242,7 +242,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
     /* Initialze the Strings */
     for (int i = 0; i < ma->count; i++) {
         if ((me[i].url = (char*)malloc(strlen(ma->source))) == NULL) {
-            MSG_ERROR("out of memory\n");
+            MSG_ERROR("out of memory.\n");
             return 1;
         }
     }
@@ -312,7 +312,7 @@ int download_hls(struct hls_media_playlist *me)
     MSG_VERBOSE("%d Segments found.\n", me->count);
     
     for (int i = 0; i < me->count; i++) {
-        printf("\rDownloading Segment %d/%d", i + 1, me->count);
+        MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
         char name[30];
         snprintf(name, sizeof(name), "%s/%d.ts", foldername, i);

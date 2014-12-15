@@ -18,12 +18,16 @@ int msg_print_va(int lvl, char *fmt, ...) {
     }
     
     if (lvl == LVL_VERBOSE) {
-        result = vfprintf(stdout, fmt, args);
+        if (loglevel > 0) {
+            result = vfprintf(stdout, fmt, args);
+        }
     }
     
     if (lvl == LVL_DBG) {
+        if (loglevel > 1) {
         fputs("Debug: ", stdout);
         result = vfprintf(stdout, fmt, args);
+        }
     }
     
     if (lvl == LVL_PRINT) {
