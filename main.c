@@ -10,11 +10,14 @@ int main(int argc, const char * argv[]) {
     char URL[500];
     int file_passed = 0;
     
-    loglevel = 0;
+    loglevel = 1;
     
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             loglevel++;
+        }
+        if (!strcmp(argv[i], "--quit")) {
+            loglevel--;
         }
         else {
             strcpy(URL, argv[i]);
