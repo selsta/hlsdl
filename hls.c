@@ -8,7 +8,7 @@
 #include "hls.h"
 #include "msg.h"
 
-static char *get_rndstring(int length)
+static char *get_rndstring(int length) //not used at the moment
 {
     int max;
     const char *letters = "abcdefghijklmnopqrstuvwxyz123456789";
@@ -310,15 +310,15 @@ int download_hls(struct hls_media_playlist *me)
     for (int i = 0; i < me->count; i++) {
         MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
-        dl_file(me->media_segment[i].url, "tmp.ts");
+        dl_file(me->media_segment[i].url, "x1y2z3.tmp.ts");
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
                 char opensslcall[300];
-                snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts tmp.ts",
+                snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in x1y2z3.tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts x1y2z3.tmp.ts",
                          me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value);
                 system(opensslcall);
             }
-            system("cat tmp.ts >> out.ts");
+            system("cat x1y2z3.tmp.ts >> out_hls.ts ; rm -rf x1y2z3.tmp.ts");
         }
     }
     MSG_VERBOSE("\n");
