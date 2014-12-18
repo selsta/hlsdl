@@ -305,51 +305,23 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
 
 int download_hls(struct hls_media_playlist *me)
 {
-    FILE *txtfile;
-    char foldername[20];
-    char txtfilepath[30];
-    char systemcall[100];
-    char *rndstring = get_rndstring(10);
-    snprintf(foldername, sizeof(foldername), "tmp_%s", rndstring);
-    snprintf(systemcall, sizeof(systemcall), "mkdir %s", foldername);
-    snprintf(txtfilepath, sizeof(txtfilepath), "%s/list.txt", foldername);
-    
-    system(systemcall); //make folder
-    
-    txtfile = fopen(txtfilepath, "w");
-    
     MSG_VERBOSE("%d Segments found.\n", me->count);
     
     for (int i = 0; i < me->count; i++) {
         MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
-        char name[30];
-        snprintf(name, sizeof(name), "%s/%d.ts", foldername, i);
-        dl_file(me->media_segment[i].url, name);
-        fprintf(txtfile, "file \'%d.ts\'\n", i);
+        dl_file(me->media_segment[i].url, "tmp.ts");
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
                 char opensslcall[300];
-                snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in %s -out %s/tmp_file -K %s -iv %s ; mv %s/tmp_file %s",
-                         name, foldername, me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value, foldername, name);
+                snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts tmp.ts",
+                         me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value);
                 system(opensslcall);
             }
+            system("cat tmp.ts >> out.ts");
         }
     }
     MSG_VERBOSE("\n");
-    fclose(txtfile);
-    
-    snprintf(systemcall, sizeof(systemcall), "ffmpeg -loglevel quiet -f concat -i %s -c copy out.ts", txtfilepath);
-    
-    system(systemcall); //ffmpeg cmnd
-    
-    snprintf(systemcall, sizeof(systemcall), "rm -rf %s/*.ts", foldername);
-    system(systemcall); //rm ts files
-    snprintf(systemcall, sizeof(systemcall), "rm -rf %s/list.txt", foldername);
-    system(systemcall); //rm list
-    snprintf(systemcall, sizeof(systemcall), "rmdir %s/", foldername);
-    system(systemcall); //rm folder
-    free(rndstring);
     return 0;
 }
 
