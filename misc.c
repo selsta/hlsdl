@@ -11,7 +11,6 @@ static void print_help()
     printf("--best    or -b ... Automaticly choose the best quality.\n");
     printf("--verbose or -v ... Verbose more information.\n");
     printf("--output  or -o ... Choose name of output file.\n");
-    printf("--best    or -b ... Automaticly choose the best quality.\n");
     printf("--help    or -h ... Print help.\n");
     printf("--quiet   or -q ... Print less to the console.\n");
     exit(0);

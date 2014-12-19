@@ -24,8 +24,6 @@ Options
 
 `--output`  or `-o` ... Choose name of output file.
 
-`--best`    or `-b` ... Automaticly choose the best quality.
-
 `--help`    or `-h` ... Print help.
 
 `--quiet`   or `-q` ... Print less to the console.
