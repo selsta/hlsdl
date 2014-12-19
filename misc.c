@@ -7,7 +7,7 @@
 
 static void print_help()
 {
-    printf("HLS Downloader\n");
+    printf("Usage: ./hls-download url [options]\n\n");
     printf("--best    or -b ... Automaticly choose the best quality.\n");
     printf("--verbose or -v ... Verbose more information.\n");
     printf("--output  or -o ... Choose name of output file.\n");
