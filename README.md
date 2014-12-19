@@ -15,6 +15,21 @@ Use `gcc -O2 ./*.c -lcurl`
 
 Windows will follow soon.
 
+Options
+-------
+
+`--best`    or `-b` ... Automaticly choose the best quality.
+
+`--verbose` or `-v` ... Verbose more information.
+
+`--output`  or `-o` ... Choose name of output file.
+
+`--best`    or `-b` ... Automaticly choose the best quality.
+
+`--help`    or `-h` ... Print help.
+
+`--quiet`   or `-q` ... Print less to the console.
+
 Todo
 ----
 
