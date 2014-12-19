@@ -1,29 +1,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <time.h>
 #include "curl.h"
 #include "hls.h"
 #include "msg.h"
-
-static char *get_rndstring(int length) //not used at the moment
-{
-    int max;
-    const char *letters = "abcdefghijklmnopqrstuvwxyz123456789";
-    int i, r;
-    srand((int)time(NULL));
-    max = length;
-    
-    char *generated = (char*)malloc(max + 1);
-    for (i = 0; i < max; i++) {
-        r = rand() % strlen(letters);
-        generated[i] = letters[r];
-    }
-    generated[max] = '\0';
-    return generated;
-}
+#include "misc.h"
 
 int get_playlist_type(char *source)
 {
@@ -307,19 +288,32 @@ int download_hls(struct hls_media_playlist *me)
 {
     MSG_VERBOSE("%d Segments found.\n", me->count);
     
+    char filename[256];
+    char *tmp_part = get_rndstring(10);
+    char tmp_part_full[10 + 7 + 1];
+    snprintf(tmp_part_full, 18, "%s.tmp.ts", tmp_part);
+    
+    if (hls_args.custom_filename) {
+        strcpy(filename, hls_args.filename);
+    } else {
+        strcpy(filename, "000_hls_output.ts");
+    }
+    
     for (int i = 0; i < me->count; i++) {
         MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
-        dl_file(me->media_segment[i].url, "x1y2z3.tmp.ts");
+        dl_file(me->media_segment[i].url, tmp_part_full);
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
-                system_va(300, "openssl aes-128-cbc -d -in x1y2z3.tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts x1y2z3.tmp.ts",
-                          me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value);
+                system_va(1000, "openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s",
+                          tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
+                          me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
             }
-            system("cat x1y2z3.tmp.ts >> out_hls.ts ; rm -rf x1y2z3.tmp.ts");
+            system_va(1000, "cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
         }
     }
     MSG_VERBOSE("\n");
+    free(tmp_part);
     return 0;
 }
 

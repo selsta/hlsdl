@@ -5,27 +5,13 @@
 #include "curl.h"
 #include "hls.h"
 #include "msg.h"
+#include "misc.h"
 
 int main(int argc, const char * argv[]) {
-    char URL[500];
-    int file_passed = 0;
     
-    loglevel = 1;
-    
-    for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
-            loglevel++;
-        }
-        if (!strcmp(argv[i], "--quit")) {
-            loglevel--;
-        }
-        else {
-            strcpy(URL, argv[i]);
-            file_passed++;
-        }
-    }
-    
-    if (file_passed != 1) {
+    hls_args.loglevel = 1;
+
+    if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");
         return 0;
     }
@@ -34,7 +20,7 @@ int main(int argc, const char * argv[]) {
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
     
-    if (get_source_from_url(URL, &hlsfile_source)) {
+    if (get_source_from_url(hls_args.url, &hlsfile_source)) {
         MSG_ERROR("Connection to server failed.\n");
         return 1;
     }
@@ -44,19 +30,32 @@ int main(int argc, const char * argv[]) {
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
-        master_playlist.url = strdup(URL);
+        master_playlist.url = strdup(hls_args.url);
         if(handle_hls_master_playlist(&master_playlist)) {
             return 1;
         }
-        print_hls_master_playlist(&master_playlist);
-        int user_input;
-        MSG_PRINT("Which Quality should be downloaded? ");
-        scanf("%d", &user_input);
-        media_playlist = master_playlist.media_playlist[user_input];
+        
+        int quality_choice;
+        if (hls_args.use_best) {
+            int max = 0;
+            for (int i = 0; i < master_playlist.count; i++) {
+                if (master_playlist.media_playlist[i].bitrate > master_playlist.media_playlist[max].bitrate) {
+                    max = i;
+                }
+            }
+            MSG_VERBOSE("Choosing best quality. (Bitrate: %d)\n", master_playlist.media_playlist[max].bitrate);
+            quality_choice = max;
+        } else {
+            print_hls_master_playlist(&master_playlist);
+            MSG_PRINT("Which Quality should be downloaded? ");
+            scanf("%d", &quality_choice);
+        }
+        
+        media_playlist = master_playlist.media_playlist[quality_choice];
         master_playlist_cleanup(&master_playlist);
     } else if (playlist_type == MEDIA_PLAYLIST) {
         media_playlist.bitrate = 0;
-        media_playlist.url = strdup(URL);
+        media_playlist.url = strdup(hls_args.url);
     } else {
         return 1;
     }
