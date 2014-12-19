@@ -313,10 +313,8 @@ int download_hls(struct hls_media_playlist *me)
         dl_file(me->media_segment[i].url, "x1y2z3.tmp.ts");
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
-                char opensslcall[300];
-                snprintf(opensslcall, 300, "openssl aes-128-cbc -d -in x1y2z3.tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts x1y2z3.tmp.ts",
-                         me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value);
-                system(opensslcall);
+                system_va(300, "openssl aes-128-cbc -d -in x1y2z3.tmp.ts -out tmp_file.ts -K %s -iv %s ; mv tmp_file.ts x1y2z3.tmp.ts",
+                          me->media_segment[i].enc_aes.key_value, me->media_segment[i].enc_aes.iv_value);
             }
             system("cat x1y2z3.tmp.ts >> out_hls.ts ; rm -rf x1y2z3.tmp.ts");
         }

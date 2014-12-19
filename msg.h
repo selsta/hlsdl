@@ -19,6 +19,7 @@
 int loglevel;
 
 int msg_print_va(int lvl, char *fmt, ...);
+int system_va(int size, char *fmt, ...);
 
 
 #endif /* defined(__HLS_DownLoad__msg__) */
