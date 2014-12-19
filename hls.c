@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "curl.h"
 #include "hls.h"
 #include "msg.h"
@@ -299,6 +300,28 @@ int download_hls(struct hls_media_playlist *me)
         strcpy(filename, "000_hls_output.ts");
     }
     
+    if (access(filename, F_OK ) != -1) {
+        if (hls_args.force_overwrite) {
+            if(remove(filename) != 0) {
+                MSG_ERROR("Error overwriting file");
+                exit(1);
+            }
+        } else {
+            char userchoice;
+            MSG_PRINT("File already exists. Overwrite? (y/n) ");
+            scanf("\n%c", &userchoice);
+            if (userchoice == 'y') {
+                if(remove(filename) != 0) {
+                    MSG_ERROR("Error overwriting file");
+                    exit(1);
+                }
+            } else {
+                MSG_WARNING("Choose a different filename. Exiting.\n");
+                exit(0);
+            }
+        }
+    }
+    
     for (int i = 0; i < me->count; i++) {
         MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
         fflush(stdout);
@@ -310,7 +333,11 @@ int download_hls(struct hls_media_playlist *me)
                           me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
             }
         }
-        system_va("cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
+        system_va("cat %s >> %s", tmp_part_full, filename);
+        if(remove(tmp_part_full) != 0) {
+            MSG_ERROR("Error deleting tmp file.");
+            exit(1);
+        }
     }
     MSG_VERBOSE("\n");
     MSG_VERBOSE("Downloaded %s to your current directory. Cleaning up.\n", filename);

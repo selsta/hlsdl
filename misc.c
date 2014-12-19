@@ -13,6 +13,7 @@ static void print_help()
     printf("--verbose or -v ... Verbose more information.\n");
     printf("--output  or -o ... Choose name of output file.\n");
     printf("--help    or -h ... Print help.\n");
+    printf("--force   or -f ... Force overwriting the output file.\n");
     printf("--quiet   or -q ... Print less to the console.\n");
     exit(0);
 }
@@ -30,6 +31,9 @@ int parse_argv(int argc, const char * argv[]) {
         }
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
             print_help();
+        }
+        else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
+            hls_args.force_overwrite = 1;
         }
         else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if ((i + 1) < argc) {

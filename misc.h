@@ -7,6 +7,7 @@ struct hls_args {
     int url_passed;
     int skip_encryption;
     int custom_filename;
+    int force_overwrite;
     char filename[256];
     char url[2048];
 };

@@ -29,6 +29,8 @@ Usage and Options
 
 `--help`    or `-h` ... Print help.
 
+`--force`   or `-f` ... Force overwriting the output file.
+
 `--quiet`   or `-q` ... Print less to the console.
 
 Todo

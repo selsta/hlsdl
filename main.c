@@ -9,6 +9,7 @@
 
 int main(int argc, const char * argv[]) {
     
+    hls_args = (struct hls_args){0};
     hls_args.loglevel = 1;
 
     if (parse_argv(argc, argv)) {
