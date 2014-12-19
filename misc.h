@@ -15,6 +15,6 @@ struct hls_args hls_args;
 
 int parse_argv(int argc, const char * argv[]);
 char *get_rndstring(int length);
-int system_va(int size_of_call, char *fmt, ...);
+int system_va(char *fmt, ...);
 
 #endif /* defined(__HLS_DownLoad__misc__) */

@@ -305,15 +305,14 @@ int download_hls(struct hls_media_playlist *me)
         dl_file(me->media_segment[i].url, tmp_part_full);
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
-                system_va(1000, "openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s",
+                system_va("openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s",
                           tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
                           me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
             }
         }
-        system_va(1000, "cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
+        system_va("cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
     }
     MSG_VERBOSE("\n");
-    
     MSG_VERBOSE("Downloaded %s to your current directory. Cleaning up.\n", filename);
     
     free(tmp_part);

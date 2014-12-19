@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include "misc.h"
+#include "msg.h"
 
 static void print_help()
 {
@@ -68,14 +69,21 @@ char *get_rndstring(int length) //not used at the moment
     return generated;
 }
 
-int system_va(int size_of_call, char *fmt, ...)
+int system_va(char *fmt, ...)
 {
     int result = 0;
     va_list args;
-    va_start(args, fmt);
     
-    char *systemcall = (char*)malloc(size_of_call);
-    result = vsnprintf(systemcall, size_of_call, fmt, args);
+    va_start(args, fmt);
+    int length = (vsnprintf(NULL, 0, fmt, args)) + 1;
+    va_end(args);
+    
+    char *systemcall = (char*)malloc(length);
+    
+    va_start(args, fmt);
+    result = vsnprintf(systemcall, length, fmt, args);
+    va_end(args);
+    
     system(systemcall);
     free(systemcall);
     return result;
