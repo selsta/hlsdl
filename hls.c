@@ -309,10 +309,13 @@ int download_hls(struct hls_media_playlist *me)
                           tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
                           me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
             }
-            system_va(1000, "cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
         }
+        system_va(1000, "cat %s >> %s ; rm -rf %s", tmp_part_full, filename, tmp_part_full);
     }
     MSG_VERBOSE("\n");
+    
+    MSG_VERBOSE("Downloaded %s to your current directory. Cleaning up.\n", filename);
+    
     free(tmp_part);
     return 0;
 }

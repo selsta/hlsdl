@@ -75,7 +75,6 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
-    MSG_VERBOSE("Downloaded out.ts to your current directory. Cleaning up.\n");
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
     return 0;
