@@ -36,11 +36,11 @@ int parse_argv(int argc, const char * argv[]) {
             hls_args.force_overwrite = 1;
         }
         else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
-            if ((i + 1) < argc) {
+            if ((i + 1) < argc && *argv[i + 1] != '-') {
                 strncpy(hls_args.filename, argv[i + 1], 256);
                 hls_args.custom_filename = 1;
+                i++;
             }
-            i++;
         }
         else {
             strcpy(hls_args.url, argv[i]);
@@ -48,7 +48,7 @@ int parse_argv(int argc, const char * argv[]) {
         }
     }
     
-    if (hls_args.url_passed) {
+    if (hls_args.url_passed == 1) {
         return 0;
     }
     
