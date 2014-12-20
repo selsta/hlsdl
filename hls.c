@@ -202,6 +202,8 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
 int handle_hls_media_playlist(struct hls_media_playlist *me)
 {
     me->encryption = false;
+    me->encryptiontype = ENC_NONE;
+    
     get_source_from_url(me->url, &me->source);
     if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
