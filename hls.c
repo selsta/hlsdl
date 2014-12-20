@@ -50,6 +50,12 @@ static int extend_url(char **url, const char *baseurl)
     }
     
     else {
+        // remove ? from baseurl.. so that /../ works
+        char *find_questionmark = strchr(baseurl, '?');
+        if (find_questionmark) {
+            *find_questionmark = '\0';
+        }
+        
         char *buffer = (char*)malloc(max_length);
         snprintf(buffer, max_length, "%s/../%s", baseurl, *url);
         *url = realloc(*url, strlen(buffer) + 1);
@@ -195,6 +201,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
 
 int handle_hls_media_playlist(struct hls_media_playlist *me)
 {
+    me->encryption = false;
     get_source_from_url(me->url, &me->source);
     if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
@@ -203,6 +210,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     me->media_segment = (struct hls_media_segment*)malloc(sizeof(struct hls_media_segment) * me->count);
     
     if (media_playlist_get_links(me)) {
+        MSG_ERROR("Could not parse links. Exiting.\n");
         return 1;
     }
     return 0;
@@ -268,9 +276,11 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
     ma->count = get_link_count(ma->source);
     ma->media_playlist = (struct hls_media_playlist*)malloc(sizeof(struct hls_media_playlist) * ma->count);
     if (master_playlist_get_links(ma)) {
+        MSG_ERROR("Could not parse links. Exiting.\n");
         return 1;
     }
     if (master_playlist_get_bitrate(ma)) {
+        MSG_ERROR("Could not parse bitrate. Exiting.\n");
         return 1;
     }
     return 0;
