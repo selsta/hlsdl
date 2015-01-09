@@ -74,6 +74,10 @@ int main(int argc, const char * argv[]) {
     
     MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
+    if (media_playlist.encryption) {
+        MSG_VERBOSE("Encryption found.\n");
+    }
+    
     if (download_hls(&media_playlist)) {
         return 1;
     }
