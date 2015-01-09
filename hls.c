@@ -191,7 +191,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
         }
     }
     
-    finish:
+finish:
     /* Extend individual urls */
     for (int i = 0; i < me->count; i++) {
         extend_url(&ms[i].url, me->url);
@@ -205,6 +205,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     me->encryptiontype = ENC_NONE;
     
     get_source_from_url(me->url, &me->source);
+    
     if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
     }
@@ -265,7 +266,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
         }
     }
     
-    finish:
+finish:
     /* Extend individual urls */
     for (int i = 0; i < ma->count; i++) {
         extend_url(&me[i].url, ma->url);

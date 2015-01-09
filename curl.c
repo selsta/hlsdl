@@ -47,6 +47,7 @@ int dl_file(char *url, char *name)
     curl_handle = curl_easy_init();
     
     if (curl_handle) {
+        url[strcspn (url, "\r" )] = '\0';
         fp = fopen(outfilename,"wb");
         curl_easy_setopt(curl_handle, CURLOPT_URL, url);
         curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
@@ -66,10 +67,12 @@ int dl_file(char *url, char *name)
     return 0;
 }
 
-int get_source_from_url(const char *url, char **source)
+int get_source_from_url(char *url, char **source)
 {
     CURL *curl_handle;
     CURLcode res;
+    
+    url[strcspn (url, "\r" )] = '\0';
     
     int errorcode = 0;
     
@@ -82,7 +85,7 @@ int get_source_from_url(const char *url, char **source)
     curl_easy_setopt(curl_handle, CURLOPT_URL, url);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36");
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (iPad; CPU OS 6_0 like Mac OS X) AppleWebKit/536.26 (KHTML, like Gecko) Version/6.0 Mobile/10A5355d Safari/8536.25");
     
     res = curl_easy_perform(curl_handle);
     
@@ -103,10 +106,12 @@ int get_source_from_url(const char *url, char **source)
     return errorcode;
 }
 
-int get_hex_from_url(const char *url, char hex[])
+int get_hex_from_url(char *url, char hex[])
 {
     CURL *curl_handle;
     CURLcode res;
+    
+    url[strcspn (url, "\r" )] = '\0';
     
     int errorcode = 0;
     

@@ -17,6 +17,8 @@ int main(int argc, const char * argv[]) {
         return 0;
     }
     
+    MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
+    
     curl_global_init(CURL_GLOBAL_ALL);
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;

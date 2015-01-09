@@ -13,7 +13,7 @@
  *     1 - error
  * Uses strdup() so free after usage
  ******************************************************/
-int get_source_from_url(const char *url, char **source);
+int get_source_from_url(char *url, char **source);
 
 /*******************************************************
  * USAGE: Pass the url and the adress of an pointer
@@ -23,7 +23,7 @@ int get_source_from_url(const char *url, char **source);
  *     1 - error
  * Uses malloc() so free after usage
  ******************************************************/
-int get_hex_from_url(const char *url, char hex[]);
+int get_hex_from_url(char *url, char hex[]);
 
 int dl_file(char *url, char *name);
 
