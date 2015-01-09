@@ -56,7 +56,7 @@ int parse_argv(int argc, const char * argv[]) {
     return 1;
 }
 
-char *get_rndstring(int length) //not used at the moment
+char *get_rndstring(int length)
 {
     int max;
     const char *letters = "abcdefghijklmnopqrstuvwxyz123456789";
