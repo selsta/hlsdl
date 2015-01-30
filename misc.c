@@ -15,6 +15,7 @@ static void print_help()
     printf("--help    or -h ... Print help.\n");
     printf("--force   or -f ... Force overwriting the output file.\n");
     printf("--quiet   or -q ... Print less to the console.\n");
+    printf("--dump-ts-urls  ... Print the links to the .ts files.\n");
     exit(0);
 }
 
@@ -34,6 +35,9 @@ int parse_argv(int argc, const char * argv[]) {
         }
         else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
             hls_args.force_overwrite = 1;
+        }
+        else if (!strcmp(argv[i], "--dump-ts-urls")) {
+            hls_args.dump_ts_urls = 1;
         }
         else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if ((i + 1) < argc && *argv[i + 1] != '-') {

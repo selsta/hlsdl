@@ -74,7 +74,11 @@ int main(int argc, const char * argv[]) {
     
     MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
-    if (download_hls(&media_playlist)) {
+    if (hls_args.dump_ts_urls) {
+        for (int i = 0; i < media_playlist.count; i++) {
+            printf("%s\n", media_playlist.media_segment[i].url);
+        }
+    } else if (download_hls(&media_playlist)) {
         return 1;
     }
     
