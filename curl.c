@@ -55,11 +55,11 @@ int dl_file(char *url, char *name)
         curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.52 Safari/537.36");
         res = curl_easy_perform(curl_handle);
         
-        
         if (res != CURLE_OK) {
             MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
             errorcode = 1;
         }
+        
         /* always cleanup */
         curl_easy_cleanup(curl_handle);
         fclose(fp);

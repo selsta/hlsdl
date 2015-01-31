@@ -34,7 +34,7 @@ int main(int argc, const char * argv[]) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
         master_playlist.url = strdup(hls_args.url);
-        if(handle_hls_master_playlist(&master_playlist)) {
+        if (handle_hls_master_playlist(&master_playlist)) {
             return 1;
         }
         

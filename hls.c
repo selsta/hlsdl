@@ -146,7 +146,7 @@ static int media_playlist_get_media_sequence(char *source)
     char *p_media_sequence = strstr(source, "#EXT-X-MEDIA-SEQUENCE:");
     
     if (p_media_sequence) {
-        if(sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
+        if (sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
             MSG_ERROR("Could not read EXT-X-MEDIA-SEQUENCE\n");
             return 0;
         }
@@ -315,7 +315,7 @@ int download_hls(struct hls_media_playlist *me)
     
     if (access(filename, F_OK ) != -1) {
         if (hls_args.force_overwrite) {
-            if(remove(filename) != 0) {
+            if (remove(filename) != 0) {
                 MSG_ERROR("Error overwriting file");
                 exit(1);
             }
@@ -324,7 +324,7 @@ int download_hls(struct hls_media_playlist *me)
             MSG_PRINT("File already exists. Overwrite? (y/n) ");
             scanf("\n%c", &userchoice);
             if (userchoice == 'y') {
-                if(remove(filename) != 0) {
+                if (remove(filename) != 0) {
                     MSG_ERROR("Error overwriting file");
                     exit(1);
                 }
@@ -347,7 +347,7 @@ int download_hls(struct hls_media_playlist *me)
             }
         }
         system_va("cat %s >> %s", tmp_part_full, filename);
-        if(remove(tmp_part_full) != 0) {
+        if (remove(tmp_part_full) != 0) {
             MSG_ERROR("Error deleting tmp file.");
             exit(1);
         }

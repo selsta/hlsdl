@@ -27,8 +27,8 @@ int msg_print_va(int lvl, char *fmt, ...) {
     
     if (lvl == LVL_DBG) {
         if (hls_args.loglevel > 1) {
-        fputs("Debug: ", stdout);
-        result = vfprintf(stdout, fmt, args);
+            fputs("Debug: ", stdout);
+            result = vfprintf(stdout, fmt, args);
         }
     }
     
