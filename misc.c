@@ -8,14 +8,14 @@
 
 static void print_help()
 {
-    printf("Usage: ./hls-download url [options]\n\n");
-    printf("--best    or -b ... Automaticly choose the best quality.\n");
-    printf("--verbose or -v ... Verbose more information.\n");
-    printf("--output  or -o ... Choose name of output file.\n");
-    printf("--help    or -h ... Print help.\n");
-    printf("--force   or -f ... Force overwriting the output file.\n");
-    printf("--quiet   or -q ... Print less to the console.\n");
-    printf("--dump-ts-urls  ... Print the links to the .ts files.\n");
+    printf("Usage: ./hls-download url [options]\n\n"
+           "--best    or -b ... Automaticly choose the best quality.\n"
+           "--verbose or -v ... Verbose more information.\n"
+           "--output  or -o ... Choose name of output file.\n"
+           "--help    or -h ... Print help.\n"
+           "--force   or -f ... Force overwriting the output file.\n"
+           "--quiet   or -q ... Print less to the console.\n"
+           "--dump-ts-urls  ... Print the links to the .ts files.\n");
     exit(0);
 }
 
@@ -80,8 +80,8 @@ char *get_rndstring(int length)
 int system_va(char *fmt, ...)
 {
     int result = 0;
-    va_list args;
     
+    va_list args;
     va_start(args, fmt);
     int length = (vsnprintf(NULL, 0, fmt, args)) + 1;
     va_end(args);

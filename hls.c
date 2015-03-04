@@ -352,6 +352,7 @@ int download_hls(struct hls_media_playlist *me)
             exit(1);
         }
     }
+    
     MSG_VERBOSE("\n");
     MSG_VERBOSE("Downloaded %s to your current directory. Cleaning up.\n", filename);
     
