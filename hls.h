@@ -37,37 +37,12 @@ struct hls_master_playlist {
     struct hls_media_playlist *media_playlist;
 };
 
-/**************************************
- * USAGE: Pass the source of a hls file
- * Return values:
- *    -1 - error
- *     0 - master_playlist
- *     1 - media_playlist
- *************************************/
 int get_playlist_type(char *source);
 
-/*****************************************************
- * USAGE: Pass a pointer to a master_playlist struct
- * Return values:
- *     0 - success
- *     1 - error
- ****************************************************/
 int handle_hls_master_playlist(struct hls_master_playlist *ma);
 
-/*****************************************************
- * USAGE: Pass a pointer to a master_playlist struct
- * Return values:
- *     0 - success
- *     1 - error
- ****************************************************/
 int handle_hls_media_playlist(struct hls_media_playlist *me);
 
-/*****************************************************
- * USAGE: Downloads a media playlist
- * Return values:
- *     0 - success
- *     1 - error
- ****************************************************/
 int download_hls(struct hls_media_playlist *me);
 
 
