@@ -67,16 +67,22 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
+#if 0
     if (media_playlist.encryptiontype == ENC_AES_SAMPLE) {
         MSG_WARNING("SAMPLE-AES Encryption is not supported yet. Exiting.\n");
         return 0;
     }
+#endif
     
     MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
     if (hls_args.dump_ts_urls) {
         for (int i = 0; i < media_playlist.count; i++) {
             printf("%s\n", media_playlist.media_segment[i].url);
+        }
+    } else if (hls_args.dump_dec_cmd) {
+        if (print_hls_dec_cmd(&media_playlist)) {
+            return 1;
         }
     } else if (download_hls(&media_playlist)) {
         return 1;

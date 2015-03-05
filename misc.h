@@ -9,6 +9,7 @@ struct hls_args {
     int custom_filename;
     int force_overwrite;
     int dump_ts_urls;
+    int dump_dec_cmd;
     char filename[256];
     char url[2048];
 };

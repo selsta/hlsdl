@@ -15,6 +15,7 @@ static void print_help()
            "--help    or -h ... Print help.\n"
            "--force   or -f ... Force overwriting the output file.\n"
            "--quiet   or -q ... Print less to the console.\n"
+           "--dump-dec-cmd  ... Print the openssl decryption command.\n"
            "--dump-ts-urls  ... Print the links to the .ts files.\n");
     exit(0);
 }
@@ -38,6 +39,9 @@ int parse_argv(int argc, const char * argv[]) {
         }
         else if (!strcmp(argv[i], "--dump-ts-urls")) {
             hls_args.dump_ts_urls = 1;
+        }
+        else if (!strcmp(argv[i], "--dump-dec-cmd")) {
+            hls_args.dump_dec_cmd = 1;
         }
         else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if ((i + 1) < argc && *argv[i + 1] != '-') {

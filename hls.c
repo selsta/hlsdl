@@ -360,6 +360,38 @@ int download_hls(struct hls_media_playlist *me)
     return 0;
 }
 
+int print_hls_dec_cmd(struct hls_media_playlist *me)
+{
+    char filename[256];
+    char *tmp_part = get_rndstring(10);
+    char tmp_part_full[10 + 7 + 1];
+    snprintf(tmp_part_full, 18, "%s.tmp.ts", tmp_part);
+    
+    if (hls_args.custom_filename) {
+        strcpy(filename, hls_args.filename);
+    } else {
+        strcpy(filename, "000_hls_output.ts");
+    }
+    
+    for (int i = 0; i < me->count; i++) {
+        if (me->encryption == true) {
+            if (me->encryptiontype == ENC_AES128) {
+                MSG_PRINT("openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s\n",
+                          tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
+                          me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
+            }
+            if (me->encryptiontype == ENC_AES_SAMPLE) {
+                MSG_PRINT("openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s\n",
+                          tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
+                          me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
+            }
+        }
+    }
+    free(tmp_part);
+    return 0;
+}
+
+
 void media_playlist_cleanup(struct hls_media_playlist *me)
 {
     free(me->source);

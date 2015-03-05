@@ -45,6 +45,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me);
 
 int download_hls(struct hls_media_playlist *me);
 
+int print_hls_dec_cmd(struct hls_media_playlist *me);
 
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
