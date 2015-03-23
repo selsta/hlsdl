@@ -86,14 +86,15 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         
         extend_url(&link_to_key, me->url);
         
-        char decrypt[33];
-        if (get_hex_from_url(link_to_key, decrypt)) {
+        char *decrypt = (char*)malloc(33);
+        if (get_data_from_url(link_to_key, &decrypt, HEXSTR)) {
             free(link_to_key);
             return 1;
         }
         
         strcpy(me->enc_aes.key_value, decrypt);
         free(link_to_key);
+        free(decrypt);
     }
     
     if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
@@ -111,13 +112,14 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         
         extend_url(&link_to_key, me->url);
         
-        char decrypt[33];
-        if (get_hex_from_url(link_to_key, decrypt)) {
+        char *decrypt = (char*)malloc(33);
+        if (get_data_from_url(link_to_key, &decrypt, HEXSTR)) {
             free(link_to_key);
             return 1;
         }
         strcpy(me->enc_aes.key_value, decrypt);
         free(link_to_key);
+        free(decrypt);
     }
     return 0;
 }
@@ -204,7 +206,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     me->encryption = false;
     me->encryptiontype = ENC_NONE;
     
-    get_source_from_url(me->url, &me->source);
+    get_data_from_url(me->url, &me->source, STRING);
     
     if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
