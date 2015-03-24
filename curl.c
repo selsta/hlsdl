@@ -30,7 +30,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return realsize;
 }
 
-size_t get_data_from_url(char *url, char **data, int type)
+size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type)
 {
     CURL *c;
     CURLcode res;
@@ -54,17 +54,13 @@ size_t get_data_from_url(char *url, char **data, int type)
         MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
     } else {
         if (type == STRING) {
-            *data = strdup(chunk.memory);
-        } else if (type == HEXSTR) {
-            *data = (char*)malloc(33);
-            int length = 0;
-            for (int i = 0; i < 16; i++) {
-                length += snprintf((*data)+length, 33 , "%02x", (unsigned char)chunk.memory[i]);
-            }
-            (*data)[32] = '\0';
+            *str = strdup(chunk.memory);
+        } else if (type == BINKEY) {
+            *bin = (uint8_t*)malloc(32);
+            *bin = memcpy(*bin, chunk.memory, 32);
         } else if (type == BINARY) {
-            *data = (char*)malloc(chunk.size);
-            *data = memcpy(*data, chunk.memory, chunk.size);
+            *bin = (uint8_t*)malloc(chunk.size);
+            *bin = memcpy(*bin, chunk.memory, chunk.size);
         }
     }
     

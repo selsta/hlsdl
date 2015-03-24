@@ -12,8 +12,8 @@
 
 struct enc_aes128 {
     bool iv_is_static;
-    char iv_value[33];
-    char key_value[33];
+    uint8_t iv_value[16];
+    uint8_t key_value[16];
 };
 
 struct hls_media_segment {

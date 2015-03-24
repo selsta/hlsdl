@@ -64,21 +64,16 @@ int parse_argv(int argc, const char * argv[]) {
     return 1;
 }
 
-char *get_rndstring(int length)
+int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
-    int max;
-    const char *letters = "abcdefghijklmnopqrstuvwxyz123456789";
-    int i, r;
-    srand((int)time(NULL));
-    max = length;
+    char *pos = hexstring;
     
-    char *generated = (char*)malloc(max + 1);
-    for (i = 0; i < max; i++) {
-        r = rand() % strlen(letters);
-        generated[i] = letters[r];
+    for(size_t count = 0; count < len; count++) {
+        char buf[3] = {pos[0], pos[1], 0};
+        data[count] = strtol(buf, NULL, 16);
+        pos += 2;
     }
-    generated[max] = '\0';
-    return generated;
+    return 0;
 }
 
 int system_va(char *fmt, ...)
