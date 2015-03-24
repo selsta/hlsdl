@@ -86,8 +86,8 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         
         extend_url(&link_to_key, me->url);
         
-        char *decrypt = (char*)malloc(33);
-        if (get_data_from_url(link_to_key, &decrypt, HEXSTR)) {
+        char *decrypt;
+        if (get_data_from_url(link_to_key, &decrypt, HEXSTR) == 0) {
             free(link_to_key);
             return 1;
         }
@@ -112,8 +112,8 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         
         extend_url(&link_to_key, me->url);
         
-        char *decrypt = (char*)malloc(33);
-        if (get_data_from_url(link_to_key, &decrypt, HEXSTR)) {
+        char *decrypt;
+        if (get_data_from_url(link_to_key, &decrypt, HEXSTR) == 0) {
             free(link_to_key);
             return 1;
         }
@@ -302,12 +302,9 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
 
 int download_hls(struct hls_media_playlist *me)
 {
-    MSG_VERBOSE("%d Segments found.\n", me->count);
-    
+    MSG_VERBOSE("Downloading %d segments.\n", me->count);
+
     char filename[256];
-    char *tmp_part = get_rndstring(10);
-    char tmp_part_full[10 + 7 + 1];
-    snprintf(tmp_part_full, 18, "%s.tmp.ts", tmp_part);
     
     if (hls_args.custom_filename) {
         strcpy(filename, hls_args.filename);
@@ -337,28 +334,17 @@ int download_hls(struct hls_media_playlist *me)
         }
     }
     
+    FILE * pFile = fopen(filename, "wb");
+    
     for (int i = 0; i < me->count; i++) {
-        MSG_VERBOSE("\rDownloading Segment %d/%d", i + 1, me->count);
-        fflush(stdout);
-        dl_file(me->media_segment[i].url, tmp_part_full);
-        if (me->encryption == true) {
-            if (me->encryptiontype == ENC_AES128) {
-                system_va("openssl aes-128-cbc -d -in %s -out %s.dec.ts -K %s -iv %s ; mv %s.dec.ts %s",
-                          tmp_part_full, tmp_part, me->media_segment[i].enc_aes.key_value,
-                          me->media_segment[i].enc_aes.iv_value, tmp_part, tmp_part_full);
-            }
-        }
-        system_va("cat %s >> %s", tmp_part_full, filename);
-        if (remove(tmp_part_full) != 0) {
-            MSG_ERROR("Error deleting tmp file.");
-            exit(1);
-        }
+        MSG_PRINT("Downloading part %d\n", i);
+        char *seg;
+        size_t len = get_data_from_url(me->media_segment[i].url, &seg, BINARY);
+        fwrite(seg, 1, len, pFile);
+        
+        free(seg);
     }
-    
-    MSG_VERBOSE("\n");
-    MSG_VERBOSE("Downloaded %s to your current directory. Cleaning up.\n", filename);
-    
-    free(tmp_part);
+    fclose(pFile);
     return 0;
 }
 

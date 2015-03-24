@@ -10,7 +10,6 @@
                    "Mobile/10A5355d Safari/8536.25"
 
 
-int get_data_from_url(char *url, char **data, int type);
-int dl_file(char *url, char *name);
+size_t get_data_from_url(char *url, char **data, int type);
 
 #endif /* defined(__HLS_DownLoad__curl__) */

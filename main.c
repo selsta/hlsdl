@@ -23,8 +23,8 @@ int main(int argc, const char * argv[]) {
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
     
-    if (get_data_from_url(hls_args.url, &hlsfile_source, STRING)) {
-        MSG_ERROR("Connection to server failed.\n");
+    if (get_data_from_url(hls_args.url, &hlsfile_source, STRING) == 0) {
+        MSG_ERROR("No result from server.\n");
         return 1;
     }
     

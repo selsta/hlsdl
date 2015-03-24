@@ -30,52 +30,12 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return realsize;
 }
 
-static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-    int written = (int)fwrite(ptr, size, nmemb, (FILE *)stream);
-    return written;
-}
-
-int dl_file(char *url, char *name)
-{
-    CURL *c;
-    FILE *fp;
-    CURLcode res;
-    int errorcode = 0;
-    char outfilename[FILENAME_MAX];
-    strcpy(outfilename, name);
-    
-    c = curl_easy_init();
-    
-    if (c) {
-        url[strcspn(url, "\r")] = '\0';
-        fp = fopen(outfilename,"wb");
-        curl_easy_setopt(c, CURLOPT_URL, url);
-        curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(c, CURLOPT_WRITEDATA, fp);
-        curl_easy_setopt(c, CURLOPT_USERAGENT, USER_AGENT);
-        res = curl_easy_perform(c);
-        
-        if (res != CURLE_OK) {
-            MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            errorcode = 1;
-        }
-        
-        /* always cleanup */
-        curl_easy_cleanup(c);
-        fclose(fp);
-    }
-    return 0;
-}
-
-int get_data_from_url(char *url, char **data, int type)
+size_t get_data_from_url(char *url, char **data, int type)
 {
     CURL *c;
     CURLcode res;
     
     url[strcspn(url, "\r")] = '\0';
-    
-    int errorcode = 0;
     
     struct MemoryStruct chunk;
     
@@ -92,20 +52,19 @@ int get_data_from_url(char *url, char **data, int type)
     
     if (res != CURLE_OK) {
         MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        errorcode = 1;
     } else {
         if (type == STRING) {
             *data = strdup(chunk.memory);
         } else if (type == HEXSTR) {
+            *data = (char*)malloc(33);
             int length = 0;
             for (int i = 0; i < 16; i++) {
                 length += snprintf((*data)+length, 33 , "%02x", (unsigned char)chunk.memory[i]);
             }
             (*data)[32] = '\0';
         } else if (type == BINARY) {
+            *data = (char*)malloc(chunk.size);
             *data = memcpy(*data, chunk.memory, chunk.size);
-        } else {
-            errorcode = 2;
         }
     }
     
@@ -115,5 +74,5 @@ int get_data_from_url(char *url, char **data, int type)
         free(chunk.memory);
     }
     
-    return errorcode;
+    return chunk.size;
 }
