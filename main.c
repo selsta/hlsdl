@@ -81,7 +81,7 @@ int main(int argc, const char * argv[]) {
             printf("%s\n", media_playlist.media_segment[i].url);
         }
     } else if (hls_args.dump_dec_cmd) {
-        if (print_hls_dec_cmd(&media_playlist)) {
+        if (print_enc_keys(&media_playlist)) {
             return 1;
         }
     } else if (download_hls(&media_playlist)) {
