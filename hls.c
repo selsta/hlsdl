@@ -309,6 +309,15 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
     }
 }
 
+static int decrypt_sample_aes(struct hls_media_segment *s, uint8_t **eb, size_t len)
+{
+    uint8_t *db = (uint8_t*)malloc(len);
+    AES128_CBC_decrypt_buffer(db, *eb, (uint32_t)len, s->enc_aes.key_value, s->enc_aes.iv_value);
+    memcpy(*eb, db, len);
+    free(db);
+    return 0;
+}
+
 static int decrypt_aes128(struct hls_media_segment *s, uint8_t **eb, size_t len)
 {
     // The AES128 method encrypts whole segments
