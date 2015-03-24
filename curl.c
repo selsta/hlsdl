@@ -18,7 +18,6 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     
     mem->memory = realloc(mem->memory, mem->size + realsize + 1);
     if (mem->memory == NULL) {
-        /* out of memory! */
         MSG_ERROR("not enough memory (realloc returned NULL)\n");
         return 0;
     }
@@ -56,8 +55,8 @@ size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type)
         if (type == STRING) {
             *str = strdup(chunk.memory);
         } else if (type == BINKEY) {
-            *bin = (uint8_t*)malloc(32);
-            *bin = memcpy(*bin, chunk.memory, 32);
+            *bin = (uint8_t*)malloc(16);
+            *bin = memcpy(*bin, chunk.memory, 16);
         } else if (type == BINARY) {
             *bin = (uint8_t*)malloc(chunk.size);
             *bin = memcpy(*bin, chunk.memory, chunk.size);

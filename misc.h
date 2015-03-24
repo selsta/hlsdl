@@ -18,6 +18,5 @@ struct hls_args hls_args;
 
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, const char * argv[]);
-int system_va(char *fmt, ...);
 
 #endif /* defined(__HLS_DownLoad__misc__) */

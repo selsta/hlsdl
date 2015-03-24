@@ -311,6 +311,8 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
 
 static int decrypt_aes128(struct hls_media_segment *s, uint8_t **eb, size_t len)
 {
+    // The AES128 method encrypts whole segments
+    // Simply decrypting it is enough
     uint8_t *db = (uint8_t*)malloc(len);
     AES128_CBC_decrypt_buffer(db, *eb, (uint32_t)len, s->enc_aes.key_value, s->enc_aes.iv_value);
     memcpy(*eb, db, len);
@@ -330,7 +332,7 @@ int download_hls(struct hls_media_playlist *me)
         strcpy(filename, "000_hls_output.ts");
     }
     
-    if (access(filename, F_OK ) != -1) {
+    if (access(filename, F_OK) != -1) {
         if (hls_args.force_overwrite) {
             if (remove(filename) != 0) {
                 MSG_ERROR("Error overwriting file");
@@ -361,6 +363,8 @@ int download_hls(struct hls_media_playlist *me)
         
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
             decrypt_aes128(&(me->media_segment[i]), &seg, len);
+        } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+            decrypt_sample_aes(&(me->media_segment[i]), &seg, len);
         }
         
         fwrite(seg, 1, len, pFile);
@@ -375,7 +379,7 @@ int print_enc_keys(struct hls_media_playlist *me)
     for (int i = 0; i < me->count; i++) {
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
-                printf("[AES-128] KEY: 0x");
+                printf("[AES-128]KEY: 0x");
                 for(size_t count = 0; count < 16; count++) {
                     printf("%02x", me->media_segment[i].enc_aes.key_value[count]);
                 }

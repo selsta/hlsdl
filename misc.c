@@ -75,23 +75,3 @@ int str_to_bin(uint8_t *data, char *hexstring, int len)
     }
     return 0;
 }
-
-int system_va(char *fmt, ...)
-{
-    int result = 0;
-    
-    va_list args;
-    va_start(args, fmt);
-    int length = (vsnprintf(NULL, 0, fmt, args)) + 1;
-    va_end(args);
-    
-    char *systemcall = (char*)malloc(length);
-    
-    va_start(args, fmt);
-    result = vsnprintf(systemcall, length, fmt, args);
-    va_end(args);
-    
-    system(systemcall);
-    free(systemcall);
-    return result;
-}
