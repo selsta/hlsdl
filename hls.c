@@ -322,7 +322,7 @@ int download_hls(struct hls_media_playlist *me)
 {
     MSG_VERBOSE("Downloading %d segments.\n", me->count);
 
-    char filename[256];
+    char filename[MAX_FILENAME_LEN];
     
     if (hls_args.custom_filename) {
         strcpy(filename, hls_args.filename);

@@ -1,6 +1,8 @@
 #ifndef __HLS_DownLoad__misc__
 #define __HLS_DownLoad__misc__
 
+#define MAX_FILENAME_LEN 256
+
 struct hls_args {
     int loglevel;
     int use_best;
@@ -10,7 +12,7 @@ struct hls_args {
     int force_overwrite;
     int dump_ts_urls;
     int dump_dec_cmd;
-    char filename[256];
+    char filename[MAX_FILENAME_LEN];
     char url[2048];
 };
 

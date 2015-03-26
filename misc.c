@@ -45,7 +45,7 @@ int parse_argv(int argc, const char * argv[]) {
         }
         else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if ((i + 1) < argc && *argv[i + 1] != '-') {
-                strncpy(hls_args.filename, argv[i + 1], 256);
+                strncpy(hls_args.filename, argv[i + 1], MAX_FILENAME_LEN);
                 hls_args.custom_filename = 1;
                 i++;
             }
