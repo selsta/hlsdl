@@ -27,12 +27,13 @@ static int extend_url(char **url, const char *baseurl)
     size_t max_length = strlen(*url) + strlen(baseurl) + 10;
     
     if (!strncmp(*url, "http://", 7) || !strncmp(*url, "https://", 8)) {
-        return 0; //absolute url, nothing to do
+        return 0;
     }
     
     else if (**url == '/') {
         char *domain = (char*)malloc(max_length);
         strcpy(domain, baseurl);
+        
         if (!sscanf(baseurl, "http://%[^/]", domain)) {
             sscanf(baseurl, "https://%[^/]", domain);
         }
@@ -40,10 +41,6 @@ static int extend_url(char **url, const char *baseurl)
         char *buffer = (char*)malloc(max_length);
         snprintf(buffer, max_length, "%s%s", domain, *url);
         *url = realloc(*url, strlen(buffer) + 1);
-        if (!*url) {
-            MSG_ERROR("out of memory");
-            exit(1);
-        }
         strcpy(*url, buffer);
         free(buffer);
         free(domain);
@@ -51,7 +48,7 @@ static int extend_url(char **url, const char *baseurl)
     }
     
     else {
-        // remove ? from baseurl.. so that /../ works
+        //URLs can have '?'. To make /../ work, remove it
         char *find_questionmark = strchr(baseurl, '?');
         if (find_questionmark) {
             *find_questionmark = '\0';
@@ -60,10 +57,6 @@ static int extend_url(char **url, const char *baseurl)
         char *buffer = (char*)malloc(max_length);
         snprintf(buffer, max_length, "%s/../%s", baseurl, *url);
         *url = realloc(*url, strlen(buffer) + 1);
-        if (!*url) {
-            MSG_ERROR("out of memory");
-            exit(1);
-        }
         strcpy(*url, buffer);
         free(buffer);
         return 0;
@@ -132,7 +125,7 @@ static int get_link_count(char *src)
 {
     int linkcount = 0;
     
-    while ((src = (strchr(src, 10)))) {
+    while ((src = (strchr(src, '\n')))) {
         src++;
         if (*src == '#') {
             continue;
@@ -162,19 +155,18 @@ static int media_playlist_get_media_sequence(char *source)
 
 static int media_playlist_get_links(struct hls_media_playlist *me)
 {
-    int media_squence_start_val = media_playlist_get_media_sequence(me->source);
+    int ms_init = media_playlist_get_media_sequence(me->source);
     struct hls_media_segment *ms = me->media_segment;
-    
-    /* Initialze the Strings */
+    char *src = me->source;
+
     for (int i = 0; i < me->count; i++) {
-        ms[i].url = (char*)malloc(strlen(me->source));
+        ms[i].url = (char*)malloc(strlen(src));
     }
     
-    char *src = me->source;
     for (int i = 0; i < me->count; i++) {
-        while ((src = (strchr(src, 10)))) {
+        while ((src = (strchr(src, '\n')))) {
             src++;
-            if (*src == 10) {
+            if (*src == '\n') {
                 continue;
             }
             if (*src == '#') {
@@ -185,7 +177,8 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 goto finish;
             }
             if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
-                ms[i].sequence_number = i + media_squence_start_val;
+                ms[i].sequence_number = i + ms_init;
+                
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     memcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value, 16);
                     if (me->enc_aes.iv_is_static == false) {
@@ -243,6 +236,7 @@ static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
                 continue;
             }
         }
+        //it can happen that here is no bandwidth information
         me[i].bitrate = 0;
     }
     return 0;
@@ -251,21 +245,16 @@ static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
 static int master_playlist_get_links(struct hls_master_playlist *ma)
 {
     struct hls_media_playlist *me = ma->media_playlist;
+    char *src = ma->source;
     
-    /* Initialze the Strings */
     for (int i = 0; i < ma->count; i++) {
-        if ((me[i].url = (char*)malloc(strlen(ma->source))) == NULL) {
-            MSG_ERROR("out of memory.\n");
-            return 1;
-        }
+        me[i].url = (char*)malloc(strlen(src));
     }
     
-    /* Get urls */
-    char *src = ma->source;
     for (int i = 0; i < ma->count; i++) {
-        while ((src = (strchr(src, 10)))) {
+        while ((src = (strchr(src, '\n')))) {
             src++;
-            if (*src == '#' || *src == 10) {
+            if (*src == '#' || *src == '\n') {
                 continue;
             }
             if (*src == '\0') {
@@ -278,7 +267,6 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
     }
     
 finish:
-    /* Extend individual urls */
     for (int i = 0; i < ma->count; i++) {
         extend_url(&me[i].url, ma->url);
     }
@@ -311,10 +299,11 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
 
 static int decrypt_sample_aes(struct hls_media_segment *s, uint8_t **eb, size_t len)
 {
-    uint8_t *db = (uint8_t*)malloc(len);
-    AES128_CBC_decrypt_buffer(db, *eb, (uint32_t)len, s->enc_aes.key_value, s->enc_aes.iv_value);
-    memcpy(*eb, db, len);
-    free(db);
+    // SAMPLE AES works by encrypting small segments of
+    // the video file and all of the audio file.
+    // Decrypt them by demuxing the ts container which
+    // requires lavf.
+    MSG_ERROR("SAMPLE-AES work in progress.\n");
     return 0;
 }
 
@@ -371,9 +360,9 @@ int download_hls(struct hls_media_playlist *me)
         size_t len = get_data_from_url(me->media_segment[i].url, NULL, &seg, BINARY);
         
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
-            decrypt_aes128(&(me->media_segment[i]), &seg, len);
+            decrypt_aes128(&me->media_segment[i], &seg, len);
         } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-            decrypt_sample_aes(&(me->media_segment[i]), &seg, len);
+            decrypt_sample_aes(&me->media_segment[i], &seg, len);
         }
         
         fwrite(seg, 1, len, pFile);
