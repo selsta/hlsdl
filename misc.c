@@ -1,3 +1,4 @@
+#include <libavformat/avformat.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -62,6 +63,87 @@ int parse_argv(int argc, const char * argv[]) {
     
     print_help();
     return 1;
+}
+
+int read_packet(void *opaque, uint8_t *buf, int buf_size)
+{
+    struct ByteBuffer *bb = opaque;
+    int size = buf_size;
+    
+    if (bb->len - bb->pos < buf_size) {
+        size = bb->len - bb->pos;
+    }
+    
+    if (size > 0) {
+        memcpy(buf, bb->data + bb->pos, size);
+        bb->pos += size;
+    }
+    return size;
+}
+
+int write_packet(void *opaque, uint8_t *buf, int buf_size)
+{
+    MSG_DBG("write_packet();\n");
+    struct ByteBuffer *bb = opaque;
+    int new_size = buf_size + bb->pos;
+    if (bb->len < new_size) {
+        MSG_ERROR("Bytebuffer to small.\n");
+        abort();
+    }
+    memcpy(bb->data + bb->pos, buf, buf_size);
+    bb->pos += buf_size;
+    return 0;
+}
+
+int64_t seek(void* opaque, int64_t offset, int whence)
+{
+    struct ByteBuffer *bb = opaque;
+    
+    switch (whence) {
+        case SEEK_SET:
+            bb->pos = (int)offset;
+            break;
+        case SEEK_CUR:
+            bb->pos += offset;
+            break;
+        case SEEK_END:
+            bb->pos = (int)(bb->len - offset);
+            break;
+        case AVSEEK_SIZE:
+            return bb->len;
+            break;
+    }
+    return bb->pos;
+}
+
+int bytes_remaining(uint8_t *pos, uint8_t *end)
+{
+    return (int)(end - pos);
+}
+
+// memmem implementation
+void *memf(const void *bstream, size_t streamlen, const void *btofind, size_t len)
+{
+    int first;
+    const void *p = bstream;
+    size_t plen = streamlen;
+    
+    if (!len) {
+        return NULL;
+    }
+    
+    first = *(uint8_t *)btofind;
+    
+    while (plen >= len && (p = memchr(p, first, plen - len + 1)))
+    {
+        if (!memcmp(p, btofind, len)) {
+            return (void *)p;
+        }
+        p++;
+        plen = streamlen - (p - bstream);
+    }
+    
+    return NULL;
 }
 
 int str_to_bin(uint8_t *data, char *hexstring, int len)

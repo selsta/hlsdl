@@ -1,3 +1,4 @@
+#include <libavformat/avformat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,8 +8,8 @@
 #include "msg.h"
 #include "misc.h"
 
-int main(int argc, const char * argv[]) {
-    
+int main(int argc, const char * argv[])
+{    
     hls_args = (struct hls_args){0};
     hls_args.loglevel = 1;
 
@@ -20,6 +21,8 @@ int main(int argc, const char * argv[]) {
     MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
     
     curl_global_init(CURL_GLOBAL_ALL);
+    av_register_all();
+    
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
     
@@ -66,13 +69,6 @@ int main(int argc, const char * argv[]) {
     if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }
-    
-#if 0
-    if (media_playlist.encryptiontype == ENC_AES_SAMPLE) {
-        MSG_WARNING("SAMPLE-AES Encryption is not supported yet. Exiting.\n");
-        return 0;
-    }
-#endif
     
     MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
     
