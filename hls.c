@@ -71,12 +71,12 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         me->enc_aes.iv_is_static = false;
         
         char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
-        char iv_str[33];
+        char iv_str[STRLEN_BTS(KEYLEN)];
         
         if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2) {
-            uint8_t *iv_bin = (uint8_t*)malloc(16);
-            str_to_bin(iv_bin, iv_str, 16);
-            memcpy(me->enc_aes.iv_value, iv_bin, 16);
+            uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
+            str_to_bin(iv_bin, iv_str, KEYLEN);
+            memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
             me->enc_aes.iv_is_static = true;
             free(iv_bin);
         }
@@ -89,7 +89,7 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
             return 1;
         }
         
-        memcpy(me->enc_aes.key_value, decrypt, 16);
+        memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
         free(link_to_key);
         free(decrypt);
     }
@@ -100,10 +100,10 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         me->enc_aes.iv_is_static = false;
         
         char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
-        char iv_key[33];
+        char iv_key[STRLEN_BTS(KEYLEN)];
         
         if (sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_key) == 2) {
-            memcpy(me->enc_aes.iv_value, iv_key, 16);
+            memcpy(me->enc_aes.iv_value, iv_key, KEYLEN);
             me->enc_aes.iv_is_static = true;
         }
         
@@ -114,7 +114,7 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
             free(link_to_key);
             return 1;
         }
-        memcpy(me->enc_aes.key_value, decrypt, 16);
+        memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
         free(link_to_key);
         free(decrypt);
     }
@@ -180,13 +180,13 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 ms[i].sequence_number = i + ms_init;
                 
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
-                    memcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value, 16);
+                    memcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
                     if (me->enc_aes.iv_is_static == false) {
-                        char iv_str[33];
-                        snprintf(iv_str, 33, "%032x\n", ms[i].sequence_number);
-                        uint8_t *iv_bin = (uint8_t*)malloc(16);
-                        str_to_bin(iv_bin, iv_str, 16);
-                        memcpy(ms[i].enc_aes.iv_value, iv_bin, 16);
+                        char iv_str[STRLEN_BTS(KEYLEN)];
+                        snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms[i].sequence_number);
+                        uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
+                        str_to_bin(iv_bin, iv_str, KEYLEN);
+                        memcpy(ms[i].enc_aes.iv_value, iv_bin, KEYLEN);
                         free(iv_bin);
                     }
                 }
@@ -378,11 +378,11 @@ int print_enc_keys(struct hls_media_playlist *me)
         if (me->encryption == true) {
             if (me->encryptiontype == ENC_AES128) {
                 printf("[AES-128]KEY: 0x");
-                for(size_t count = 0; count < 16; count++) {
+                for(size_t count = 0; count < KEYLEN; count++) {
                     printf("%02x", me->media_segment[i].enc_aes.key_value[count]);
                 }
                 printf(" IV: 0x");
-                for(size_t count = 0; count < 16; count++) {
+                for(size_t count = 0; count < KEYLEN; count++) {
                     printf("%02x", me->media_segment[i].enc_aes.iv_value[count]);
                 }
                 printf("\n");

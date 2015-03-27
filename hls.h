@@ -10,10 +10,12 @@
 #define ENC_AES128 0x01
 #define ENC_NONE 0x00
 
+#define KEYLEN 16
+
 struct enc_aes128 {
     bool iv_is_static;
-    uint8_t iv_value[16];
-    uint8_t key_value[16];
+    uint8_t iv_value[KEYLEN];
+    uint8_t key_value[KEYLEN];
 };
 
 struct hls_media_segment {
