@@ -11,9 +11,9 @@ This program needs openssl to decrypt files.
 Build
 -----
 
-Use `gcc -O2 ./*.c -lcurl`
+Use `gcc -O2 ./*.c -lcurl -lavformat -lavutil -lavcodec`
 
-Windows will follow soon.
+Windows should work already, but is untested. 
 
 Usage and Options
 -------
