@@ -69,8 +69,13 @@ int main(int argc, const char * argv[])
     if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }
+
+    if (media_playlist.encryption) {
+        MSG_PRINT("HLS Stream is %s encrypted.\n",
+                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" : "SAMPLE-AES");
+    }
     
-    MSG_VERBOSE("Media Playlist parsed, downloading now!\n");
+    MSG_VERBOSE("Media Playlist parsed successfully.\n");
     
     if (hls_args.dump_ts_urls) {
         for (int i = 0; i < media_playlist.count; i++) {
