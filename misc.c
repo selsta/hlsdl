@@ -121,31 +121,6 @@ int bytes_remaining(uint8_t *pos, uint8_t *end)
     return (int)(end - pos);
 }
 
-// memmem implementation
-void *memf(const void *bstream, size_t streamlen, const void *btofind, size_t len)
-{
-    int first;
-    const void *p = bstream;
-    size_t plen = streamlen;
-    
-    if (!len) {
-        return NULL;
-    }
-    
-    first = *(uint8_t *)btofind;
-    
-    while (plen >= len && (p = memchr(p, first, plen - len + 1)))
-    {
-        if (!memcmp(p, btofind, len)) {
-            return (void *)p;
-        }
-        p++;
-        plen = streamlen - (p - bstream);
-    }
-    
-    return NULL;
-}
-
 int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
     char *pos = hexstring;
