@@ -21,7 +21,8 @@ static void print_help()
     exit(0);
 }
 
-int parse_argv(int argc, const char * argv[]) {
+int parse_argv(int argc, const char * argv[])
+{
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             hls_args.loglevel++;
@@ -79,20 +80,6 @@ int read_packet(void *opaque, uint8_t *buf, int buf_size)
         bb->pos += size;
     }
     return size;
-}
-
-int write_packet(void *opaque, uint8_t *buf, int buf_size)
-{
-    MSG_DBG("write_packet();\n");
-    struct ByteBuffer *bb = opaque;
-    int new_size = buf_size + bb->pos;
-    if (bb->len < new_size) {
-        MSG_ERROR("Bytebuffer to small.\n");
-        abort();
-    }
-    memcpy(bb->data + bb->pos, buf, buf_size);
-    bb->pos += buf_size;
-    return 0;
 }
 
 int64_t seek(void* opaque, int64_t offset, int whence)

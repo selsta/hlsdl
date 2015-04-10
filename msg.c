@@ -4,7 +4,8 @@
 #include "msg.h"
 #include "misc.h"
 
-int msg_print_va(int lvl, char *fmt, ...) {
+int msg_print_va(int lvl, char *fmt, ...)
+{
     int result = 0;
     va_list args;
     va_start(args, fmt);

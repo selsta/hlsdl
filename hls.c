@@ -320,10 +320,10 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     AVFormatContext *ifmt_ctx = avformat_alloc_context();
     ifmt_ctx->pb = input_io_ctx;
     
-    AVFormatContext *ofmt_ctx = NULL;
-    if (avformat_alloc_output_context2(&ofmt_ctx, NULL, NULL, "video.ts") < 0) {
-        MSG_ERROR("Allocating output context failed.\n");
-    }
+    AVOutputFormat *ofmt = av_guess_format(NULL, "video.ts", NULL);
+    
+    AVFormatContext *ofmt_ctx = avformat_alloc_context();
+    ofmt_ctx->oformat = ofmt;
     
     if (avformat_open_input(&ifmt_ctx, "file.h264", ifmt, NULL) != 0) {
         MSG_ERROR("Opening input file failed\n");
@@ -363,10 +363,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
         ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
     }
     
-    if (!(ofmt_ctx->flags & AVFMT_NOFILE)) {
-        if(avio_open(&ofmt_ctx->pb, "000_312_tmp.ts", AVIO_FLAG_WRITE) < 0) {
-            MSG_ERROR("Could not open output file.\n");
-        }
+    if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
+            MSG_ERROR("Could not open output memory stream.\n");
     }
     
     AVPacket pkt;
@@ -491,28 +489,19 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
         MSG_ERROR("Prolem writing trailer.\n");
     }
     
-    if (!(ofmt_ctx->flags & AVFMT_NOFILE)) {
-        avio_close(ofmt_ctx->pb);
-    }
-
-    FILE *tmp = fopen("000_312_tmp.ts", "rb");
-    if (!tmp) {
-        MSG_ERROR("Temporary file could not be opened.\n");
-    }
-    fseek(tmp, 0, SEEK_END);
-    long fsize = ftell(tmp);
-    rewind(tmp);
-    buf->data = realloc(buf->data, fsize);
-    buf->len = (int)fsize;
-    fread(buf->data, fsize, 1, tmp);
+    uint8_t *outbuf;
+    buf->len = avio_close_dyn_buf(ofmt_ctx->pb, &outbuf);
+    
+    buf->data = realloc(buf->data, buf->len);
+    memcpy(buf->data, outbuf, buf->len);
     
     av_free(input_io_ctx->buffer);
     av_free(input_io_ctx);
+    av_free(outbuf);
     input_avbuff = NULL;
     avformat_free_context(ifmt_ctx);
     avformat_free_context(ofmt_ctx);
-    fclose(tmp);
-    remove("000_312_tmp.ts");
+    
     return 0;
 }
 
