@@ -54,9 +54,11 @@ int main(int argc, const char * argv[])
         } else {
             print_hls_master_playlist(&master_playlist);
             MSG_PRINT("Which Quality should be downloaded? ");
-            scanf("%d", &quality_choice);
+            if (scanf("%d", &quality_choice) != 1) {
+                MSG_ERROR("Input is not a number.\n");
+                exit(1);
+            }
         }
-        
         media_playlist = master_playlist.media_playlist[quality_choice];
         master_playlist_cleanup(&master_playlist);
     } else if (playlist_type == MEDIA_PLAYLIST) {
