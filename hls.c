@@ -292,19 +292,15 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     int audio_index = -1, video_index = -1;
     static int audio_sample_rate = 0, audio_frame_size = 0;
     
-    struct ByteBuffer input_buffer;
+    struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
     
-    input_buffer.data = buf->data;
-    input_buffer.len = buf->len;
-    input_buffer.pos = 0;
-    
-    AVInputFormat *ifmt = av_find_input_format("ts");
+    AVInputFormat *ifmt = av_find_input_format("mpegts");
     uint8_t *input_avbuff = av_malloc(4096);
     AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer, read_packet, NULL, seek);
     AVFormatContext *ifmt_ctx = avformat_alloc_context();
     ifmt_ctx->pb = input_io_ctx;
     
-    AVOutputFormat *ofmt = av_guess_format(NULL, "video.ts", NULL);
+    AVOutputFormat *ofmt = av_guess_format("mpegts", NULL, NULL);
     
     AVFormatContext *ofmt_ctx = avformat_alloc_context();
     ofmt_ctx->oformat = ofmt;
@@ -339,10 +335,12 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
         MSG_ERROR("Video or Audio missing.");
     }
     
+    
+    // It can happen that only the first segment contains
+    // useful sample_rate/frame_size data.
     if (ofmt_ctx->streams[audio_index]->codec->sample_rate == 0) {
         ofmt_ctx->streams[audio_index]->codec->sample_rate = audio_sample_rate;
     }
-    
     if (ofmt_ctx->streams[audio_index]->codec->frame_size == 0) {
         ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
     }
@@ -475,17 +473,15 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     
     uint8_t *outbuf;
     buf->len = avio_close_dyn_buf(ofmt_ctx->pb, &outbuf);
-    
     buf->data = realloc(buf->data, buf->len);
     memcpy(buf->data, outbuf, buf->len);
+    av_free(outbuf);
     
     av_free(input_io_ctx->buffer);
     av_free(input_io_ctx);
-    av_free(outbuf);
     input_avbuff = NULL;
     avformat_free_context(ifmt_ctx);
     avformat_free_context(ofmt_ctx);
-    
     return 0;
 }
 
