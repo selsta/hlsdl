@@ -371,7 +371,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     uint8_t packet_iv[16];
 
     if (avformat_write_header(ofmt_ctx, NULL) != 0) {
-        MSG_ERROR("Error writing header.");
+        MSG_ERROR("Writing header failed.\n");
     }
     
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
@@ -412,7 +412,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 p_frame += 16;
             }
             if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
-                MSG_WARNING("Problem writing audio frame.\n");
+                MSG_WARNING("Writing audio frame failed.\n");
             }
         } else if (pkt.stream_index == video_index) {
             uint8_t *h264_frame = pkt.data;
@@ -480,13 +480,13 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
             }
             pkt.size = bytes_remaining(pkt.data, end);
             if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
-                MSG_WARNING("Problem writing video frame.\n");
+                MSG_WARNING("Writing video frame failed.\n");
             }
         }
         av_free_packet(&pkt);
     }
     if (av_write_trailer(ofmt_ctx) != 0) {
-        MSG_ERROR("Prolem writing trailer.\n");
+        MSG_ERROR("Writing trailer failed.\n");
     }
     
     uint8_t *outbuf;
