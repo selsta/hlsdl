@@ -20,23 +20,23 @@ Usage and Options
 `./hls-download url [options]`
 
 ---------------------------
+```
+--best    or -b  ... Automaticly choose the best quality.
 
-`--best`    or `-b` ... Automaticly choose the best quality.
+--verbose or -v  ... Verbose more information.
 
-`--verbose` or `-v` ... Verbose more information.
+--output  or -o  ... Choose name of output file.
 
-`--output`  or `-o` ... Choose name of output file.
+--help    or -h  ... Print help.
 
-`--help`    or `-h` ... Print help.
+--force   or -f  ... Force overwriting the output file.
 
-`--force`   or `-f` ... Force overwriting the output file.
+--quiet   or -q  ... Print less to the console.
 
-`--quiet`   or `-q` ... Print less to the console.
+--dump-dec-cmd   ... Print the Key and IV of each media segment.
 
-`--dump-dec-cmd`    ... Print the Key and IV of each media segment.
-
-`--dump-ts-urls`    ... Print the links to the .ts files.
-
+--dump-ts-urls   ... Print the links to the .ts files.
+```
 Todo
 ----
 
