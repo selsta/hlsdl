@@ -67,59 +67,43 @@ static int extend_url(char **url, const char *baseurl)
 
 static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
 {
+    int enc_type;
+    
     if (!strncmp(tag, "#EXT-X-KEY:METHOD=AES-128", 25)) {
-        me->encryption = true;
-        me->encryptiontype = ENC_AES128;
-        me->enc_aes.iv_is_static = false;
-        
-        char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
-        char iv_str[STRLEN_BTS(KEYLEN)];
-        
-        if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2) {
-            uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
-            str_to_bin(iv_bin, iv_str, KEYLEN);
-            memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
-            me->enc_aes.iv_is_static = true;
-            free(iv_bin);
-        }
-        
-        extend_url(&link_to_key, me->url);
-        
-        uint8_t *decrypt;
-        if (get_data_from_url(link_to_key, NULL, &decrypt, BINKEY) == 0) {
-            free(link_to_key);
-            return 1;
-        }
-        
-        memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
-        free(link_to_key);
-        free(decrypt);
+        enc_type = ENC_AES128;
+    } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
+        enc_type = ENC_AES_SAMPLE;
+    } else  {
+        return 1;
     }
     
-    if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
-        me->encryption = true;
-        me->encryptiontype = ENC_AES_SAMPLE;
-        me->enc_aes.iv_is_static = false;
+    me->encryption = true;
+    me->encryptiontype = enc_type;
+    me->enc_aes.iv_is_static = false;
         
-        char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
-        char iv_key[STRLEN_BTS(KEYLEN)];
+    char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
+    char iv_str[STRLEN_BTS(KEYLEN)];
         
-        if (sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_key) == 2) {
-            memcpy(me->enc_aes.iv_value, iv_key, KEYLEN);
-            me->enc_aes.iv_is_static = true;
-        }
-        
-        extend_url(&link_to_key, me->url);
-        
-        uint8_t *decrypt;
-        if (get_data_from_url(link_to_key, NULL, &decrypt, BINKEY) == 0) {
-            free(link_to_key);
-            return 1;
-        }
-        memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
-        free(link_to_key);
-        free(decrypt);
+    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2 ||
+        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2) {
+        uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
+        str_to_bin(iv_bin, iv_str, KEYLEN);
+        memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
+        me->enc_aes.iv_is_static = true;
+        free(iv_bin);
     }
+        
+    extend_url(&link_to_key, me->url);
+        
+    uint8_t *decrypt;
+    if (get_data_from_url(link_to_key, NULL, &decrypt, BINKEY) == 0) {
+        free(link_to_key);
+        return 1;
+    }
+    
+    memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
+    free(link_to_key);
+    free(decrypt);
     return 0;
 }
 
