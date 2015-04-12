@@ -7,9 +7,9 @@
 #include "misc.h"
 #include "msg.h"
 
-static void print_help()
+static void print_help(const char *filename)
 {
-    printf("Usage: ./hls-download url [options]\n\n"
+    printf("Usage: %s url [options]\n\n"
            "--best    or -b ... Automaticly choose the best quality.\n"
            "--verbose or -v ... Verbose more information.\n"
            "--output  or -o ... Choose name of output file.\n"
@@ -17,7 +17,7 @@ static void print_help()
            "--force   or -f ... Force overwriting the output file.\n"
            "--quiet   or -q ... Print less to the console.\n"
            "--dump-dec-cmd  ... Print the openssl decryption command.\n"
-           "--dump-ts-urls  ... Print the links to the .ts files.\n");
+           "--dump-ts-urls  ... Print the links to the .ts files.\n", filename);
     exit(0);
 }
 
@@ -34,7 +34,7 @@ int parse_argv(int argc, const char * argv[])
             hls_args.use_best = 1;
         }
         else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-            print_help();
+            print_help(argv[0]);
         }
         else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
             hls_args.force_overwrite = 1;
@@ -62,7 +62,7 @@ int parse_argv(int argc, const char * argv[])
         return 0;
     }
     
-    print_help();
+    print_help(argv[0]);
     return 1;
 }
 
