@@ -97,6 +97,7 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
         
     uint8_t *decrypt;
     if (get_data_from_url(link_to_key, NULL, &decrypt, BINKEY) == 0) {
+        MSG_ERROR("Getting key-file failed.\n");
         free(link_to_key);
         return 1;
     }
