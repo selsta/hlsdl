@@ -217,15 +217,13 @@ static int master_playlist_get_bitrate(struct hls_master_playlist *ma)
     
     char *src = ma->source;
     
-    for (int i = 0; i < ma->count; i++) {
+    for (int i = 0; i < ma->count && src; i++) {
         if ((src = strstr(src, "BANDWIDTH="))) {
             if ((sscanf(src, "BANDWIDTH=%u", &me[i].bitrate)) == 1) {
                 src++;
                 continue;
             }
         }
-        //it can happen that here is no bandwidth information
-        me[i].bitrate = 0;
     }
     return 0;
 }
@@ -269,6 +267,11 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
         MSG_ERROR("Could not parse links. Exiting.\n");
         return 1;
     }
+    
+    for (int i = 0; i < ma->count; i++) {
+        ma->media_playlist[i].bitrate = 0;
+    }
+    
     if (master_playlist_get_bitrate(ma)) {
         MSG_ERROR("Could not parse bitrate. Exiting.\n");
         return 1;
