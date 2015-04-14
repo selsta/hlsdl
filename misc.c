@@ -1,5 +1,6 @@
 #include <libavformat/avformat.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
