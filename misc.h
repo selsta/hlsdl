@@ -4,6 +4,7 @@
 #define STRLEN_BTS(LEN) (((LEN) * 2) + 1)
 
 #define MAX_FILENAME_LEN 256
+#define MAX_URL_LEN 2048
 
 struct ByteBuffer {
     uint8_t *data;
@@ -21,7 +22,7 @@ struct hls_args {
     int dump_ts_urls;
     int dump_dec_cmd;
     char filename[MAX_FILENAME_LEN];
-    char url[2048];
+    char url[MAX_URL_LEN];
 };
 
 static const uint8_t h264_nal_init[3]   = {0x00, 0x00, 0x01};

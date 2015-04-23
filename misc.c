@@ -54,8 +54,13 @@ int parse_argv(int argc, const char * argv[])
             }
         }
         else {
-            strcpy(hls_args.url, argv[i]);
-            hls_args.url_passed++;
+            if (strlen(argv[i]) < MAX_URL_LEN) {
+                strcpy(hls_args.url, argv[i]);
+                hls_args.url_passed++;
+            } else {
+                MSG_ERROR("URL too long.");
+                exit(1);
+            }
         }
     }
     
