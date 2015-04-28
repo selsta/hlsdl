@@ -51,7 +51,7 @@ static int extend_url(char **url, const char *baseurl)
     }
     
     else {
-        //URLs can have '?'. To make /../ work, remove it
+        // URLs can have '?'. To make /../ work, remove it.
         char *find_questionmark = strchr(baseurl, '?');
         if (find_questionmark) {
             *find_questionmark = '\0';
@@ -184,7 +184,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     }
     
 finish:
-    /* Extend individual urls */
+    // Extend the individual urls.
     for (int i = 0; i < me->count; i++) {
         extend_url(&ms[i].url, me->url);
     }
@@ -363,7 +363,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     
     while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
         if (pkt.stream_index == audio_index) {
-            //The IV must be reset at the beginning of every packet.
+            // The IV must be reset at the beginning of every packet.
             memcpy(packet_iv, s->enc_aes.iv_value, 16);
             
             uint8_t *audio_frame = pkt.data;
@@ -492,8 +492,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
 
 static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
-    // The AES128 method encrypts whole segments
-    // Simply decrypting them is enough
+    // The AES128 method encrypts whole segments.
+    // Simply decrypting them is enough.
     uint8_t *db = (uint8_t*)malloc(buf->len);
     AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len, s->enc_aes.key_value, s->enc_aes.iv_value);
     memcpy(buf->data, db, buf->len);

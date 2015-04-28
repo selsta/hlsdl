@@ -25,9 +25,9 @@ struct hls_args {
     char url[MAX_URL_LEN];
 };
 
-static const uint8_t h264_nal_init[3]   = {0x00, 0x00, 0x01};
+static const uint8_t h264_nal_init[3] = {0x00, 0x00, 0x01};
 
-//start code emulation prevention table
+// start code emulation prevention table
 static const uint8_t h264_scep_search[4][4] =
                   {{0x00, 0x00, 0x03, 0x00},
                    {0x00, 0x00, 0x03, 0x01},
