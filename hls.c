@@ -402,6 +402,9 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 MSG_WARNING("Writing audio frame failed.\n");
             }
         } else if (pkt.stream_index == video_index) {
+            // av_return_frame returns whole h264 frames. SAMPLE-AES
+            // encrypts NAL units instead of frames. Fortunatly, a frame
+            // contains multiple NAL units, so av_return_frame can be used.
             uint8_t *h264_frame = pkt.data;
             uint8_t *p = h264_frame;
             uint8_t *end = p + pkt.size;
