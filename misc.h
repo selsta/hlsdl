@@ -43,9 +43,9 @@ static const uint8_t h264_scep_replace[4][3] =
 struct hls_args hls_args;
 
 int read_packet(void *opaque, uint8_t *buf, int buf_size);
-int64_t seek(void* opaque, int64_t offset, int whence);
+int64_t seek(void *opaque, int64_t offset, int whence);
 int bytes_remaining(uint8_t *pos, uint8_t *end);
 int str_to_bin(uint8_t *data, char *hexstring, int len);
-int parse_argv(int argc, const char * argv[]);
+int parse_argv(int argc, const char *argv[]);
 
 #endif /* defined(__HLS_DownLoad__misc__) */

@@ -34,14 +34,14 @@ static int extend_url(char **url, const char *baseurl)
     }
     
     else if (**url == '/') {
-        char *domain = (char*)malloc(max_length);
+        char *domain = malloc(max_length);
         strcpy(domain, baseurl);
         
         if (!sscanf(baseurl, "http://%[^/]", domain)) {
             sscanf(baseurl, "https://%[^/]", domain);
         }
         
-        char *buffer = (char*)malloc(max_length);
+        char *buffer = malloc(max_length);
         snprintf(buffer, max_length, "%s%s", domain, *url);
         *url = realloc(*url, strlen(buffer) + 1);
         strcpy(*url, buffer);
@@ -57,7 +57,7 @@ static int extend_url(char **url, const char *baseurl)
             *find_questionmark = '\0';
         }
         
-        char *buffer = (char*)malloc(max_length);
+        char *buffer = malloc(max_length);
         snprintf(buffer, max_length, "%s/../%s", baseurl, *url);
         *url = realloc(*url, strlen(buffer) + 1);
         strcpy(*url, buffer);
@@ -82,12 +82,13 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
     me->encryptiontype = enc_type;
     me->enc_aes.iv_is_static = false;
         
-    char *link_to_key = (char*)malloc(strlen(tag) + strlen(me->url) + 10);
+    char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)];
         
     if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2 ||
-        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2) {
-        uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
+        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2)
+    {
+        uint8_t *iv_bin = malloc(KEYLEN);
         str_to_bin(iv_bin, iv_str, KEYLEN);
         memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
         me->enc_aes.iv_is_static = true;
@@ -148,7 +149,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     char *src = me->source;
 
     for (int i = 0; i < me->count; i++) {
-        ms[i].url = (char*)malloc(strlen(src));
+        ms[i].url = malloc(strlen(src));
     }
     
     for (int i = 0; i < me->count; i++) {
@@ -172,7 +173,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                     if (me->enc_aes.iv_is_static == false) {
                         char iv_str[STRLEN_BTS(KEYLEN)];
                         snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms[i].sequence_number);
-                        uint8_t *iv_bin = (uint8_t*)malloc(KEYLEN);
+                        uint8_t *iv_bin = malloc(KEYLEN);
                         str_to_bin(iv_bin, iv_str, KEYLEN);
                         memcpy(ms[i].enc_aes.iv_value, iv_bin, KEYLEN);
                         free(iv_bin);
@@ -202,7 +203,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
         return 1;
     }
     me->count = get_link_count(me->source);
-    me->media_segment = (struct hls_media_segment*)malloc(sizeof(struct hls_media_segment) * me->count);
+    me->media_segment = malloc(sizeof(struct hls_media_segment) * me->count);
     
     if (media_playlist_get_links(me)) {
         MSG_ERROR("Could not parse links. Exiting.\n");
@@ -234,7 +235,7 @@ static int master_playlist_get_links(struct hls_master_playlist *ma)
     char *src = ma->source;
     
     for (int i = 0; i < ma->count; i++) {
-        me[i].url = (char*)malloc(strlen(src));
+        me[i].url = malloc(strlen(src));
     }
     
     for (int i = 0; i < ma->count; i++) {
@@ -262,7 +263,7 @@ finish:
 int handle_hls_master_playlist(struct hls_master_playlist *ma)
 {
     ma->count = get_link_count(ma->source);
-    ma->media_playlist = (struct hls_media_playlist*)malloc(sizeof(struct hls_media_playlist) * ma->count);
+    ma->media_playlist = malloc(sizeof(struct hls_media_playlist) * ma->count);
     if (master_playlist_get_links(ma)) {
         MSG_ERROR("Could not parse links. Exiting.\n");
         return 1;
@@ -301,7 +302,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     
     AVInputFormat *ifmt = av_find_input_format("mpegts");
     uint8_t *input_avbuff = av_malloc(4096);
-    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer, read_packet, NULL, seek);
+    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer,
+                                                   read_packet, NULL, seek);
     AVFormatContext *ifmt_ctx = avformat_alloc_context();
     ifmt_ctx->pb = input_io_ctx;
     
@@ -497,8 +499,9 @@ static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
     // The AES128 method encrypts whole segments.
     // Simply decrypting them is enough.
-    uint8_t *db = (uint8_t*)malloc(buf->len);
-    AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len, s->enc_aes.key_value, s->enc_aes.iv_value);
+    uint8_t *db = malloc(buf->len);
+    AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len,
+                              s->enc_aes.key_value, s->enc_aes.iv_value);
     memcpy(buf->data, db, buf->len);
     free(db);
     return 0;

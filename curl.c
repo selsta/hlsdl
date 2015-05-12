@@ -57,10 +57,10 @@ size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type)
         if (type == STRING) {
             *str = strdup(chunk.memory);
         } else if (type == BINKEY) {
-            *bin = (uint8_t*)malloc(KEYLEN);
+            *bin = malloc(KEYLEN);
             *bin = memcpy(*bin, chunk.memory, KEYLEN);
         } else if (type == BINARY) {
-            *bin = (uint8_t*)malloc(chunk.size);
+            *bin = malloc(chunk.size);
             *bin = memcpy(*bin, chunk.memory, chunk.size);
         }
     }

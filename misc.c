@@ -22,7 +22,7 @@ static void print_help(const char *filename)
     exit(0);
 }
 
-int parse_argv(int argc, const char * argv[])
+int parse_argv(int argc, const char *argv[])
 {
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
@@ -88,7 +88,7 @@ int read_packet(void *opaque, uint8_t *buf, int buf_size)
     return size;
 }
 
-int64_t seek(void* opaque, int64_t offset, int whence)
+int64_t seek(void *opaque, int64_t offset, int whence)
 {
     struct ByteBuffer *bb = opaque;
     
@@ -118,7 +118,7 @@ int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
     char *pos = hexstring;
     
-    for(size_t count = 0; count < len; count++) {
+    for (size_t count = 0; count < len; count++) {
         char buf[3] = {pos[0], pos[1], 0};
         data[count] = strtol(buf, NULL, 16);
         pos += 2;
