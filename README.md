@@ -1,4 +1,4 @@
-HLS-Downloader
+hlsdl
 ==============
 
 This program converts .m3u8 playlists to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
@@ -6,18 +6,16 @@ This program converts .m3u8 playlists to a .ts video. It supports decryption of 
 Requirements
 ------------
 
-This program needs openssl to decrypt files.
+This program requirers FFmpeg installed in order to decrypt SAMPLE-AES content.
 
 Build
 -----
 
-Use `gcc -O2 ./*.c -lcurl -lavformat -lavutil -lavcodec`
-
-Windows should work already, but is untested. 
+Use `make && make install && make clean` to install.
 
 Usage and Options
 -------
-`./hls-download url [options]`
+`./hlsdl url [options]`
 
 ---------------------------
 ```
