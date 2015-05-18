@@ -1,3 +1,4 @@
+# Makefile inspiration from Kore (Kore.io)
 CC?=gcc
 PREFIX?=/usr/local
 HLSDL=hlsdl
