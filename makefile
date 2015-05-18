@@ -17,7 +17,7 @@ ifeq ("$(OSNAME)", "darwin")
 	CFLAGS+=-I/usr/local/include/
 	LDFLAGS+=-L/usr/local/lib
 else ifeq ("$(OSNAME)", "linux")
-	CFLAGS+=-D_GNU_SOURCE=1
+	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
 else
 endif
 
