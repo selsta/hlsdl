@@ -118,7 +118,7 @@ int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
     char *pos = hexstring;
     
-    for (size_t count = 0; count < len; count++) {
+    for (int count = 0; count < len; count++) {
         char buf[3] = {pos[0], pos[1], 0};
         data[count] = strtol(buf, NULL, 16);
         pos += 2;

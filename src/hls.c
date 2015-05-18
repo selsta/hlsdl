@@ -321,7 +321,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     avformat_find_stream_info(ifmt_ctx, NULL);
     av_log_set_level(AV_LOG_PRINT_LEVEL);
     
-    for (int i = 0; i < ifmt_ctx->nb_streams; i++) {
+    for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
         AVCodecContext *in_c = ifmt_ctx->streams[i]->codec;
         if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
             avformat_new_stream(ofmt_ctx, in_c->codec);
