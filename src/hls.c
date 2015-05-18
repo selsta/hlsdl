@@ -1,4 +1,5 @@
 #include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <string.h>
 #include <stdio.h>
