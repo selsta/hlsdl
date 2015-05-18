@@ -1,6 +1,8 @@
 #ifndef __HLS_DownLoad__misc__
 #define __HLS_DownLoad__misc__
 
+#include <stdint.h>
+
 #define STRLEN_BTS(LEN) (((LEN) * 2) + 1)
 
 #define MAX_FILENAME_LEN 256
