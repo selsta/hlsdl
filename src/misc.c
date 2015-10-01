@@ -27,26 +27,19 @@ int parse_argv(int argc, const char *argv[])
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             hls_args.loglevel++;
-        }
-        else if (!strcmp(argv[i], "-q") || !strcmp(argv[i], "--quiet")) {
+        } else if (!strcmp(argv[i], "-q") || !strcmp(argv[i], "--quiet")) {
             hls_args.loglevel--;
-        }
-        else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--best")) {
+        } else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--best")) {
             hls_args.use_best = 1;
-        }
-        else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+        } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
             print_help(argv[0]);
-        }
-        else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
+        } else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
             hls_args.force_overwrite = 1;
-        }
-        else if (!strcmp(argv[i], "--dump-ts-urls")) {
+        } else if (!strcmp(argv[i], "--dump-ts-urls")) {
             hls_args.dump_ts_urls = 1;
-        }
-        else if (!strcmp(argv[i], "--dump-dec-cmd")) {
+        } else if (!strcmp(argv[i], "--dump-dec-cmd")) {
             hls_args.dump_dec_cmd = 1;
-        }
-        else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
+        } else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
             if ((i + 1) < argc && *argv[i + 1] != '-') {
                 strncpy(hls_args.filename, argv[i + 1], MAX_FILENAME_LEN);
                 hls_args.custom_filename = 1;
