@@ -353,7 +353,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     }
     
     if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
-            MSG_ERROR("Could not open output memory stream.\n");
+        MSG_ERROR("Could not open output memory stream.\n");
     }
     
     AVPacket pkt;
