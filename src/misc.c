@@ -56,11 +56,11 @@ int parse_argv(int argc, const char *argv[])
             }
         }
     }
-    
+
     if (hls_args.url_passed == 1) {
         return 0;
     }
-    
+
     print_help(argv[0]);
     return 1;
 }
@@ -69,11 +69,11 @@ int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     struct ByteBuffer *bb = opaque;
     int size = buf_size;
-    
+
     if (bb->len - bb->pos < buf_size) {
         size = bb->len - bb->pos;
     }
-    
+
     if (size > 0) {
         memcpy(buf, bb->data + bb->pos, size);
         bb->pos += size;
@@ -84,7 +84,7 @@ int read_packet(void *opaque, uint8_t *buf, int buf_size)
 int64_t seek(void *opaque, int64_t offset, int whence)
 {
     struct ByteBuffer *bb = opaque;
-    
+
     switch (whence) {
         case SEEK_SET:
             bb->pos = (int)offset;
@@ -110,7 +110,7 @@ int bytes_remaining(uint8_t *pos, uint8_t *end)
 int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
     char *pos = hexstring;
-    
+
     for (int count = 0; count < len; count++) {
         char buf[3] = {pos[0], pos[1], 0};
         data[count] = strtol(buf, NULL, 16);

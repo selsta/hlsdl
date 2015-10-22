@@ -10,7 +10,7 @@
 #include "misc.h"
 
 int main(int argc, const char * argv[])
-{    
+{
     hls_args = (struct hls_args){0};
     hls_args.loglevel = 1;
 
@@ -18,22 +18,22 @@ int main(int argc, const char * argv[])
         MSG_WARNING("No files passed. Exiting.\n");
         return 0;
     }
-    
+
     MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
-    
+
     curl_global_init(CURL_GLOBAL_ALL);
     av_register_all();
-    
+
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
-    
+
     if (get_data_from_url(hls_args.url, &hlsfile_source, NULL, STRING) == 0) {
         MSG_ERROR("No result from server.\n");
         return 1;
     }
-    
+
     int playlist_type = get_playlist_type(hlsfile_source);
-    
+
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
@@ -41,7 +41,7 @@ int main(int argc, const char * argv[])
         if (handle_hls_master_playlist(&master_playlist)) {
             return 1;
         }
-        
+
         int quality_choice;
         if (hls_args.use_best) {
             int max = 0;
@@ -68,7 +68,7 @@ int main(int argc, const char * argv[])
     } else {
         return 1;
     }
-    
+
     if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }
@@ -77,9 +77,9 @@ int main(int argc, const char * argv[])
         MSG_PRINT("HLS Stream is %s encrypted.\n",
                   media_playlist.encryptiontype == ENC_AES128 ? "AES-128" : "SAMPLE-AES");
     }
-    
+
     MSG_VERBOSE("Media Playlist parsed successfully.\n");
-    
+
     if (hls_args.dump_ts_urls) {
         for (int i = 0; i < media_playlist.count; i++) {
             MSG_PRINT("%s\n", media_playlist.media_segment[i].url);
