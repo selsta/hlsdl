@@ -376,12 +376,12 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 // ADTS headers can contain CRC checks.
                 // If the CRC check bit is 0, CRC exists.
                 //
-                // Header (7 or 9 byte) + unecrypted leader (16 bytes)
+                // Header (7 or 9 byte) + unencrypted leader (16 bytes)
                 p_frame += (p_frame[1] & 0x01) ? 23 : 25;
             } else if (cid == AV_CODEC_ID_AC3) {
                 // AC3 Audio is untested. Sample streams welcome.
                 //
-                // unecrypted leader
+                // unencrypted leader
                 p_frame += 16;
             } else {
                 MSG_ERROR("This audio coded is unsupported.\n");
