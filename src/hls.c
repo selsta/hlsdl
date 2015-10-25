@@ -384,7 +384,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 // unencrypted leader
                 p_frame += 16;
             } else {
-                MSG_ERROR("This audio coded is unsupported.\n");
+                MSG_ERROR("This audio codec is unsupported.\n");
                 exit(1);
             }
 
