@@ -40,3 +40,5 @@ Todo
 
 - Multithreading
 - Remuxing to other formats
+- Local .m3u8 files
+
