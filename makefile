@@ -11,7 +11,7 @@ CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=-Wsign-compare -Iincludes -g
 CFLAGS+=-DPREFIX='"$(PREFIX)"'
-LDFLAGS+=-lcurl -lavformat -lavutil -lavcodec
+LDFLAGS+=-lcurl -lavformat -lavutil -lavcodec -lswresample
 
 OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 ifeq ("$(OSNAME)", "darwin")

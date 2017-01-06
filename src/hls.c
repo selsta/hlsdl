@@ -66,7 +66,7 @@ static int extend_url(char **url, const char *baseurl)
     }
 }
 
-static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
+static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms, char *tag)
 {
     int enc_type;
 
@@ -75,6 +75,22 @@ static int parse_playlist_tag(struct hls_media_playlist *me, char *tag)
     } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
         enc_type = ENC_AES_SAMPLE;
     } else  {
+        if (!strncmp(tag, "#EXTINF:", 8)){
+            if(sscanf(tag+8, "%d",  &(ms->duration)) == 1){
+                return 0;
+            }
+        } else if (!strncmp(tag, "#EXT-X-ENDLIST", 14)){
+            me->is_endlist = true;
+            return 0;
+        } else if (!strncmp(tag, "#EXT-X-MEDIA-SEQUENCE:", 22)){
+            if(sscanf(tag+22, "%d",  &(me->last_media_sequence)) == 1){
+                return 0;
+            }
+        } else if (!strncmp(tag, "#EXT-X-TARGETDURATION:", 22)){
+            if(sscanf(tag+22, "%d",  &(me->target_duration)) == 1){
+                return 0;
+            }
+        }
         return 1;
     }
 
@@ -128,67 +144,93 @@ static int get_link_count(char *src)
     return linkcount;
 }
 
-static int media_playlist_get_media_sequence(char *source)
-{
-    int j = 0;
-    char *p_media_sequence = strstr(source, "#EXT-X-MEDIA-SEQUENCE:");
-
-    if (p_media_sequence) {
-        if (sscanf(p_media_sequence, "#EXT-X-MEDIA-SEQUENCE:%d", &j) != 1) {
-            MSG_ERROR("Could not read EXT-X-MEDIA-SEQUENCE\n");
-            return 0;
-        }
-    }
-    return j;
-}
-
 static int media_playlist_get_links(struct hls_media_playlist *me)
 {
-    int ms_init = media_playlist_get_media_sequence(me->source);
-    struct hls_media_segment *ms = me->media_segment;
+    struct hls_media_segment *ms = NULL;
+    struct hls_media_segment *curr_ms = NULL;
     char *src = me->source;
-
-    for (int i = 0; i < me->count; i++) {
-        ms[i].url = malloc(strlen(src));
-    }
     
-    for (int i = 0; i < me->count; i++) {
+    int i = 0;
+    while(src != NULL){
+        if (ms == NULL)
+        {
+            ms = malloc(sizeof(struct hls_media_segment));
+            memset(ms, 0x00, sizeof(struct hls_media_segment));
+        }
+        
         while ((src = (strchr(src, '\n')))) {
             src++;
             if (*src == '\n') {
                 continue;
             }
+            if (*src == '\r') {
+                continue;
+            }
             if (*src == '#') {
-                parse_playlist_tag(me, src);
+                parse_tag(me, ms, src);
                 continue;
             }
             if (*src == '\0') {
                 goto finish;
             }
-            if (sscanf(src, "%[^\n]", ms[i].url) == 1) {
-                ms[i].sequence_number = i + ms_init;
-
+            
+            char *end_ptr = strchr(src, '\n');
+            if (end_ptr != NULL) {
+                int url_size = (int)(end_ptr - src) + 1;
+                ms->url = malloc(url_size);
+                memset(ms->url, 0x00, url_size);
+                strncpy(ms->url, src, url_size-1);
+                
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
-                    memcpy(ms[i].enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
+                    memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
                     if (me->enc_aes.iv_is_static == false) {
                         char iv_str[STRLEN_BTS(KEYLEN)];
-                        snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms[i].sequence_number);
+                        snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms->sequence_number);
                         uint8_t *iv_bin = malloc(KEYLEN);
                         str_to_bin(iv_bin, iv_str, KEYLEN);
-                        memcpy(ms[i].enc_aes.iv_value, iv_bin, KEYLEN);
+                        memcpy(ms->enc_aes.iv_value, iv_bin, KEYLEN);
                         free(iv_bin);
                     }
                 }
+                
+                /* Get full url */
+                extend_url(&(ms->url), me->url);
+                
+                ms->sequence_number = i + me->last_media_sequence;
+                
+                /* Add new segment to segment list */
+                if (me->first_media_segment == NULL)
+                {
+                    me->first_media_segment = ms;
+                    curr_ms = ms;
+                }
+                else
+                {
+                    curr_ms->next = ms;
+                    ms->prev = curr_ms;
+                    curr_ms = ms;
+                }
+                ms = NULL;
+                i += 1;
                 break;
             }
         }
     }
 
 finish:
-    // Extend the individual urls.
-    for (int i = 0; i < me->count; i++) {
-        extend_url(&ms[i].url, me->url);
+    me->last_media_segment = curr_ms;
+
+    if (i > 0) {
+        me->last_media_sequence += i - 1;
     }
+    
+    if (ms != NULL) {
+        if (ms->url != NULL) {
+            free(ms->url);
+        }
+        free(ms);
+    }
+    
     return 0;
 }
 
@@ -202,8 +244,11 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
     }
-    me->count = get_link_count(me->source);
-    me->media_segment = malloc(sizeof(struct hls_media_segment) * me->count);
+    me->first_media_segment = NULL;
+    me->last_media_segment = NULL;
+    me->target_duration = 0;
+    me->is_endlist = false;
+    me->last_media_sequence = 0;
 
     if (media_playlist_get_links(me)) {
         MSG_ERROR("Could not parse links. Exiting.\n");
@@ -263,7 +308,9 @@ finish:
 int handle_hls_master_playlist(struct hls_master_playlist *ma)
 {
     ma->count = get_link_count(ma->source);
-    ma->media_playlist = malloc(sizeof(struct hls_media_playlist) * ma->count);
+    int tab_size = sizeof(struct hls_media_playlist) * ma->count;
+    ma->media_playlist = malloc(tab_size);
+    memset(ma->media_playlist, 0x00, tab_size);
     if (master_playlist_get_links(ma)) {
         MSG_ERROR("Could not parse links. Exiting.\n");
         return 1;
@@ -475,7 +522,11 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                 MSG_WARNING("Writing video frame failed.\n");
             }
         }
+#if LIBAVCODEC_VERSION_MAJOR >= 56
         av_packet_unref(&pkt);
+#else
+        av_free_packet(&pkt);
+#endif
     }
     if (av_write_trailer(ofmt_ctx) != 0) {
         MSG_ERROR("Writing trailer failed.\n");
@@ -509,7 +560,7 @@ static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
 
 int download_hls(struct hls_media_playlist *me)
 {
-    MSG_VERBOSE("Downloading %d segments.\n", me->count);
+    MSG_VERBOSE("Downloading segments.\n");
 
     char filename[MAX_FILENAME_LEN];
 
@@ -543,36 +594,42 @@ int download_hls(struct hls_media_playlist *me)
 
     FILE *pFile = fopen(filename, "wb");
 
-    for (int i = 0; i < me->count; i++) {
-        MSG_PRINT("Downloading part %d\n", i);
+    struct hls_media_segment *ms = me->first_media_segment;
+    while(ms) {
+        MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         struct ByteBuffer seg;
-        seg.len = (int)get_data_from_url(me->media_segment[i].url, NULL, &(seg.data), BINARY);
+        seg.len = (int)get_data_from_url(ms->url, NULL, &(seg.data), BINARY);
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
-            decrypt_aes128(&me->media_segment[i], &seg);
+            decrypt_aes128(ms, &seg);
         } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-            decrypt_sample_aes(&me->media_segment[i], &seg);
+            decrypt_sample_aes(ms, &seg);
         }
         fwrite(seg.data, 1, seg.len, pFile);
         free(seg.data);
+        
+        ms = ms->next;
     }
+    
     fclose(pFile);
     return 0;
 }
 
 int print_enc_keys(struct hls_media_playlist *me)
 {
-    for (int i = 0; i < me->count; i++) {
+    struct hls_media_segment *ms = me->first_media_segment;
+    while(ms) {
         if (me->encryption == true) {
             MSG_PRINT("[AES-128]KEY: 0x");
             for(size_t count = 0; count < KEYLEN; count++) {
-                MSG_PRINT("%02x", me->media_segment[i].enc_aes.key_value[count]);
+                MSG_PRINT("%02x", ms->enc_aes.key_value[count]);
             }
             MSG_PRINT(" IV: 0x");
             for(size_t count = 0; count < KEYLEN; count++) {
-                MSG_PRINT("%02x", me->media_segment[i].enc_aes.iv_value[count]);
+                MSG_PRINT("%02x", ms->enc_aes.iv_value[count]);
             }
             MSG_PRINT("\n");
         }
+        ms = ms->next;
     }
     return 0;
 }
@@ -580,12 +637,18 @@ int print_enc_keys(struct hls_media_playlist *me)
 
 void media_playlist_cleanup(struct hls_media_playlist *me)
 {
+    struct hls_media_segment *ms = me->first_media_segment;
     free(me->source);
     free(me->url);
-    for (int i = 0; i < me->count; i++) {
-        free(me->media_segment[i].url);
+    
+    while(ms){
+        me->first_media_segment = ms->next;
+        free(ms->url);
+        free(ms);
+        ms = me->first_media_segment;
     }
-    free(me->media_segment);
+    // me->first_media_segment = NULL; // <- this must be NULL already
+    me->last_media_segment = NULL;
 }
 
 void master_playlist_cleanup(struct hls_master_playlist *ma)

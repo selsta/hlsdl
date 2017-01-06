@@ -21,17 +21,23 @@ struct enc_aes128 {
 struct hls_media_segment {
     char *url;
     int sequence_number;
+    int duration;
     struct enc_aes128 enc_aes;
+    struct hls_media_segment *next;
+    struct hls_media_segment *prev;
 };
 
 struct hls_media_playlist {
     char *url;
     char *source;
     unsigned int bitrate;
+    int target_duration;
+    bool is_endlist;
     bool encryption;
     int encryptiontype;
-    int count;
-    struct hls_media_segment *media_segment;
+    int last_media_sequence;
+    struct hls_media_segment *first_media_segment;
+    struct hls_media_segment *last_media_segment;
     struct enc_aes128 enc_aes;
 };
 
@@ -50,4 +56,6 @@ int print_enc_keys(struct hls_media_playlist *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
+void add_media_segment(struct hls_media_playlist *me);
+
 #endif /* defined(__HLS_DownLoad__hls__) */
