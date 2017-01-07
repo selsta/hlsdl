@@ -14,9 +14,9 @@
 
 #define MIN_REFRESH_DELAY    1
 #define MAX_REFRESH_DELAY    5
-#define MAX_RETRIES          3
-#define DWN_TIMEOUT         10
-#define LIVE_START_OFFSET  120
+#define HLSDL_MAX_RETRIES    3
+#define HLSDL_DWN_TIMEOUT         10
+#define HLSDL_LIVE_START_OFFSET  120
 
 struct enc_aes128 {
     bool iv_is_static;

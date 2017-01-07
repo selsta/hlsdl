@@ -78,6 +78,9 @@ long get_data_from_url_with_session(void **session, char **url, char **out, size
 
     if (res != CURLE_OK) {
         MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        if (http_code == 200) {
+            http_code = -res;
+        }
     } else {
         if (type == STRING) {
             *out = strdup(chunk.memory);

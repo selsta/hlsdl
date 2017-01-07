@@ -13,6 +13,8 @@ int main(int argc, const char * argv[])
 {
     hls_args = (struct hls_args){0};
     hls_args.loglevel = 1;
+    hls_args.segment_download_retries = HLSDL_MAX_RETRIES;
+    hls_args.live_start_offset = HLSDL_LIVE_START_OFFSET;
 
     if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");

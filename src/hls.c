@@ -750,11 +750,10 @@ int download_live_hls(struct hls_media_playlist *me)
     // skip first segments
     if (me->first_media_segment != me->last_media_segment) {
         struct hls_media_segment *ms = me->last_media_segment;
-        int live_start_offset = LIVE_START_OFFSET;
         int duration = 0;
         while (ms) {
             duration += ms->duration;
-            if (duration >= live_start_offset) {
+            if (duration >= hls_args.live_start_offset) {
                 break;
             }
             ms = ms->prev;
@@ -917,33 +916,43 @@ int download_hls(struct hls_media_playlist *me)
     void *session = init_http_session();
     assert(session);
     
+    int retries = 0;
     int downloaded_duration = 0;
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms && ret == 0) {
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         struct ByteBuffer seg;
+        memset(&seg, 0x00, sizeof(seg));
         size_t size = 0;
-        long http_code = get_data_from_url_with_session(&session, &(ms->url), (char **)&(seg.data), &size, BINARY, true);
+        long http_code = get_data_from_url_with_session(&session, &(ms->url), (char **)&(seg.data), &size, BINARY, false);
         seg.len = (int)size;
         if (http_code != 200) {
-            MSG_API("{\"http_error_code\":%d}\n", (int) http_code);
             if (seg.data) {
                 free(seg.data);
+                seg.data = NULL;
+            }
+            if (retries <= hls_args.segment_download_retries) {
+                sleep(1);
+                MSG_WARNING("VOD retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
+                retries += 1;
+                continue;
             }
             ret = 1;
+            MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
             break;
+        } else {
+            downloaded_duration += ms->duration;
+            MSG_API("{\"t_duration\":%d,\"d_duration\":%d}\n", me->total_duration, downloaded_duration);
+            if (me->encryption == true && me->encryptiontype == ENC_AES128) {
+                decrypt_aes128(ms, &seg);
+            } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+                decrypt_sample_aes(ms, &seg);
+            }
+            fwrite(seg.data, 1, seg.len, pFile);
+            free(seg.data);
         }
         
-        downloaded_duration += ms->duration;
-        MSG_API("{\"t_duration\":%d,\"d_duration\":%d}\n", me->total_duration, downloaded_duration);
-        if (me->encryption == true && me->encryptiontype == ENC_AES128) {
-            decrypt_aes128(ms, &seg);
-        } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-            decrypt_sample_aes(ms, &seg);
-        }
-        fwrite(seg.data, 1, seg.len, pFile);
-        free(seg.data);
-        
+        retries = 0;
         ms = ms->next;
     }
     
