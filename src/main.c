@@ -11,7 +11,7 @@
 
 int main(int argc, const char * argv[])
 {
-    hls_args = (struct hls_args){0};
+    memset(&hls_args, 0x00, sizeof(hls_args));
     hls_args.loglevel = 1;
     hls_args.segment_download_retries = HLSDL_MAX_RETRIES;
     hls_args.live_start_offset = HLSDL_LIVE_START_OFFSET;
@@ -31,7 +31,7 @@ int main(int argc, const char * argv[])
     memset(&media_playlist, 0x00, sizeof(media_playlist));
     char *url = strdup(hls_args.url);
     size_t size = 0;
-    long http_code = get_data_from_url_ext(&url, &hlsfile_source, &size, STRING, true);
+    long http_code = get_hls_data_from_url(&url, &hlsfile_source, &size, STRING, true);
     
     
     if (http_code != 200) {

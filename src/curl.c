@@ -8,6 +8,12 @@
 #include "curl.h"
 #include "hls.h"
 
+struct http_session {
+    void *handle;
+    void *headers;
+    char *user_agent;
+};
+
 struct MemoryStruct {
     char *memory;
     size_t size;
@@ -32,21 +38,54 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return realsize;
 }
 
-
 void * init_http_session(void)
 {
+    struct http_session *session = malloc(sizeof(struct http_session));
     CURL *c;
+    memset(session, 0x00, sizeof(struct http_session));
     c = curl_easy_init();
-    return c;
+    session->handle = c;
+    return session;
 }
 
-long get_data_from_url_with_session(void **session, char **url, char **out, size_t *size, int type, bool update_url)
+void * set_user_agent_http_session(void *ptr_session, const char *user_agent)
 {
-    assert(session && *session);
+    struct http_session *session = ptr_session;
+    assert(session);
+    
+    if (user_agent) {
+        if (session->user_agent) {
+            free(session->user_agent);
+        }
+        session->user_agent = malloc(strlen(user_agent)+1);
+        strcpy(session->user_agent, user_agent);
+    }
+    
+    return session;
+}
+
+void * add_custom_header_http_session(void *ptr_session, const char *header)
+{
+    struct http_session *session = ptr_session;
+    assert(session);
+    if (header) {
+        struct curl_slist *headers = session->headers;
+        headers = curl_slist_append(headers, header);
+        session->headers = headers;
+    }
+}
+
+long get_data_from_url_with_session(void **ptr_session, char **url, char **out, size_t *size, int type, bool update_url)
+{
+    assert(ptr_session && *ptr_session);
+    struct http_session *session = *ptr_session;
+    struct curl_slist *headers = session->headers;
+    
+    assert(session->handle);
     assert(url && *url);
     assert(size);
-
-    CURL *c = (CURL *)(*session);
+    
+    CURL *c = (CURL *)(session->handle);
     CURLcode res;
     long http_code = 0;
     char *e_url = NULL;
@@ -61,7 +100,15 @@ long get_data_from_url_with_session(void **session, char **url, char **out, size
     curl_easy_setopt(c, CURLOPT_URL, *url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(c, CURLOPT_USERAGENT, USER_AGENT);
+    if (session->user_agent) {
+        curl_easy_setopt(c, CURLOPT_USERAGENT, session->user_agent);
+    } else {
+        curl_easy_setopt(c, CURLOPT_USERAGENT, USER_AGENT);
+    }
+    if (headers) {
+        curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
+    }
+    
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
 
     res = curl_easy_perform(c);
@@ -102,17 +149,20 @@ long get_data_from_url_with_session(void **session, char **url, char **out, size
     return http_code;
 }
 
-void clean_http_session(void *session)
+void clean_http_session(void *ptr_session)
 {
-    curl_easy_cleanup((CURL *)session);
-}
-
-long get_data_from_url_ext(char **url, char **out, size_t *size, int type, bool update_url)
-{
-    CURL *c = (CURL *)init_http_session();
-    long http_code = get_data_from_url_with_session(&c, url, out, size, type, update_url);
-    clean_http_session(c);
-    return http_code;
+    struct http_session *session = ptr_session;
+    curl_easy_cleanup(session->handle);
+    
+    /* free user agent if set */ 
+    if (session->user_agent) {
+        free(session->user_agent);
+    }
+    
+    /* free the custom headers if set */ 
+    if (session->headers) {
+        curl_slist_free_all(session->headers);
+    }
 }
 
 size_t get_data_from_url(char **url, char **str, uint8_t **bin, int type, bool update_url)

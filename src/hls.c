@@ -15,6 +15,38 @@
 #include "misc.h"
 #include "aes.h"
 
+static void set_hls_http_header(void *session)
+{
+    if (hls_args.user_agent) {
+        set_user_agent_http_session(session, hls_args.user_agent);
+    }
+    
+    for (int i=0; i<HLSDL_MAX_NUM_OF_CUSTOM_HEADERS; ++i) {
+        if (hls_args.custom_headers[i]) {
+            add_custom_header_http_session(session, hls_args.custom_headers[i]);
+        }
+        else {
+            break;
+        }
+    }
+}
+
+static void * init_hls_session(void)
+{
+    void *session = init_http_session();
+    assert(session);
+    set_hls_http_header(session);
+    return session;
+}
+
+long get_hls_data_from_url(char **url, char **out, size_t *size, int type, bool update_url)
+{
+    void *session = init_hls_session();
+    long http_code = get_data_from_url_with_session(&session, url, out, size, type, update_url);
+    clean_http_session(session);
+    return http_code;
+}
+
 int get_playlist_type(char *source)
 {
     if (strncmp("#EXTM3U", source, 7) != 0) {
@@ -117,8 +149,11 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
         
     extend_url(&link_to_key, me->url);
 
-    uint8_t *decrypt;
-    if (get_data_from_url(&link_to_key, NULL, &decrypt, BINKEY, false) == 0) {
+    char *decrypt;
+    size_t size = 0;
+    long http_code = get_hls_data_from_url(&link_to_key, &decrypt, &size, BINKEY, false);
+    
+    if (http_code != 200 || size == 0) {
         MSG_ERROR("Getting key-file failed.\n");
         free(link_to_key);
         return 1;
@@ -253,10 +288,10 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
 {
     me->encryption = false;
     me->encryptiontype = ENC_NONE;
-
-    get_data_from_url(&(me->url), &me->source, NULL, STRING, true);
-
-    if (get_playlist_type(me->source) != MEDIA_PLAYLIST) {
+    
+    size_t size = 0;
+    long http_code = get_hls_data_from_url(&me->url, &me->source, &size, STRING, true);
+    if (200 != http_code || get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
     }
     me->first_media_segment = NULL;
@@ -584,7 +619,7 @@ static void *hls_playlist_update_thread(void *arg)
     pthread_cond_t  *media_playlist_refresh_cond = (pthread_cond_t *)(updater_params->media_playlist_refresh_cond);
     pthread_cond_t  *media_playlist_empty_cond   = (pthread_cond_t *)(updater_params->media_playlist_empty_cond);
     
-    void *session = init_http_session();
+    void *session = init_hls_session();
     bool is_endlist = false;
     char *url = NULL;
     int refresh_delay = 0;
@@ -596,10 +631,10 @@ static void *hls_playlist_update_thread(void *arg)
     refresh_delay = me->target_duration;
     //pthread_mutex_unlock(media_playlist_mtx);
     
-    if (refresh_delay > MAX_REFRESH_DELAY) {
-        refresh_delay = MAX_REFRESH_DELAY;
-    } else if (refresh_delay < MIN_REFRESH_DELAY) {
-        refresh_delay = MIN_REFRESH_DELAY;
+    if (refresh_delay > HLSDL_MAX_REFRESH_DELAY) {
+        refresh_delay = HLSDL_MAX_REFRESH_DELAY;
+    } else if (refresh_delay < HLSDL_MIN_REFRESH_DELAY) {
+        refresh_delay = HLSDL_MIN_REFRESH_DELAY;
     }
     
     struct timespec ts;
@@ -692,7 +727,7 @@ int download_live_hls(struct hls_media_playlist *me)
     MSG_API("{\"download_type\":\"live\"}\n");
     
     char filename[MAX_FILENAME_LEN];
-    if (hls_args.custom_filename) {
+    if (hls_args.filename) {
         strcpy(filename, hls_args.filename);
     } else {
         strcpy(filename, "000_hls_output.ts");
@@ -780,7 +815,7 @@ int download_live_hls(struct hls_media_playlist *me)
     
     pthread_create(&thread, NULL, hls_playlist_update_thread, &updater_params);
     
-    void *session = init_http_session();
+    void *session = init_hls_session();
     int downloaded_duration = 0;
     int total_duration = 0;
     
@@ -877,7 +912,7 @@ int download_hls(struct hls_media_playlist *me)
     MSG_API("{\"t_duration\":%d,\"d_duration\":0}\n", me->total_duration);
 
     char filename[MAX_FILENAME_LEN];
-    if (hls_args.custom_filename) {
+    if (hls_args.filename) {
         strcpy(filename, hls_args.filename);
     } else {
         strcpy(filename, "000_hls_output.ts");
@@ -913,7 +948,7 @@ int download_hls(struct hls_media_playlist *me)
     }
     
     int ret = 0;
-    void *session = init_http_session();
+    void *session = init_hls_session();
     assert(session);
     
     int retries = 0;

@@ -7,6 +7,7 @@
 
 #define MAX_FILENAME_LEN 256
 #define MAX_URL_LEN 2048
+#define HLSDL_MAX_NUM_OF_CUSTOM_HEADERS 256
 
 struct ByteBuffer {
     uint8_t *data;
@@ -17,16 +18,16 @@ struct ByteBuffer {
 struct hls_args {
     int loglevel;
     int use_best;
-    int url_passed;
     int skip_encryption;
-    int custom_filename;
     int force_overwrite;
     int dump_ts_urls;
     int dump_dec_cmd;
     int segment_download_retries;
     int live_start_offset;
-    char filename[MAX_FILENAME_LEN];
-    char url[MAX_URL_LEN];
+    char *filename;
+    char *url;
+    char *user_agent;
+    char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
 };
 
 static const uint8_t h264_nal_init[3] = {0x00, 0x00, 0x01};

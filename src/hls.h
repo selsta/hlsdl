@@ -12,10 +12,9 @@
 
 #define KEYLEN 16
 
-#define MIN_REFRESH_DELAY    1
-#define MAX_REFRESH_DELAY    5
-#define HLSDL_MAX_RETRIES    3
-#define HLSDL_DWN_TIMEOUT         10
+#define HLSDL_MIN_REFRESH_DELAY    1
+#define HLSDL_MAX_REFRESH_DELAY    5
+#define HLSDL_MAX_RETRIES         30
 #define HLSDL_LIVE_START_OFFSET  120
 
 struct enc_aes128 {
@@ -75,5 +74,7 @@ void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
 void add_media_segment(struct hls_media_playlist *me);
+
+long get_hls_data_from_url(char **url, char **out, size_t *size, int type, bool update_url);
 
 #endif /* defined(__HLS_DownLoad__hls__) */

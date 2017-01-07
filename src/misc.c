@@ -5,62 +5,77 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <unistd.h>
 #include "misc.h"
 #include "msg.h"
 
 static void print_help(const char *filename)
 {
     printf("Usage: %s url [options]\n\n"
-           "--best    or -b ... Automaticly choose the best quality.\n"
-           "--verbose or -v ... Verbose more information.\n"
-           "--output  or -o ... Choose name of output file.\n"
-           "--help    or -h ... Print help.\n"
-           "--force   or -f ... Force overwriting the output file.\n"
-           "--quiet   or -q ... Print less to the console.\n"
-           "--dump-dec-cmd  ... Print the openssl decryption command.\n"
-           "--dump-ts-urls  ... Print the links to the .ts files.\n", filename);
+           "-b ... Automaticly choose the best quality.\n"
+           "-v ... Verbose more information.\n"
+           "-o ... Choose name of output file.\n"
+           "-u ... Set custom HTTP User-Agent header\n"
+           "-h ... Set custom HTTP header.\n"
+           "-f ... Force overwriting the output file.\n"
+           "-q ... Print less to the console.\n"
+           "-d ... Print the openssl decryption command.\n"
+           "-t ... Print the links to the .ts files.\n", filename);
     exit(0);
 }
 
 int parse_argv(int argc, const char *argv[])
 {
-    for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
+    int ret = 0;
+    int c = 0;
+    int custom_header_idx = 0;
+    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:")) != -1) 
+    {
+        switch (c) 
+        {
+        case 'v':
             hls_args.loglevel++;
-        } else if (!strcmp(argv[i], "-q") || !strcmp(argv[i], "--quiet")) {
+            break;
+        case 'q':
             hls_args.loglevel = -1;
-        } else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--best")) {
+            break;
+        case 'b':
             hls_args.use_best = 1;
-        } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
-            print_help(argv[0]);
-        } else if (!strcmp(argv[i], "-f") || !strcmp(argv[i], "--force")) {
+            break;
+        case 'h':
+            if (custom_header_idx < HLSDL_MAX_NUM_OF_CUSTOM_HEADERS) {
+                hls_args.custom_headers[custom_header_idx] = optarg;
+                custom_header_idx += 1;
+            }
+            break;
+        case 'f':
             hls_args.force_overwrite = 1;
-        } else if (!strcmp(argv[i], "--dump-ts-urls")) {
+            break;
+        case 'o':
+            hls_args.filename = optarg;
+            break;
+        case 't':
             hls_args.dump_ts_urls = 1;
-        } else if (!strcmp(argv[i], "--dump-dec-cmd")) {
+            break;
+        case 'd':
             hls_args.dump_dec_cmd = 1;
-        } else if (!strcmp(argv[i], "-o") || !strcmp(argv[i], "--output")) {
-            if ((i + 1) < argc && *argv[i + 1] != '-') {
-                strncpy(hls_args.filename, argv[i + 1], MAX_FILENAME_LEN);
-                hls_args.custom_filename = 1;
-                i++;
-            }
-        }
-        else {
-            if (strlen(argv[i]) < MAX_URL_LEN) {
-                strcpy(hls_args.url, argv[i]);
-                hls_args.url_passed++;
-            } else {
-                MSG_ERROR("URL too long.");
-                exit(1);
-            }
+            break;
+        case 'u':
+            hls_args.user_agent = optarg;
+            break;
+        default:
+            MSG_ERROR("?? getopt returned character code 0%o ??\n", c);
+            ret = -1;
         }
     }
-
-    if (hls_args.url_passed == 1) {
+    
+    if (0 == ret && (optind+1) == argc) 
+    {
+        ret = 0;
+        hls_args.url = argv[optind];
         return 0;
     }
-
+    
     print_help(argv[0]);
     return 1;
 }
