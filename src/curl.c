@@ -62,6 +62,7 @@ long get_data_from_url_with_session(void **session, char **url, char **out, size
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
     curl_easy_setopt(c, CURLOPT_USERAGENT, USER_AGENT);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
 
     res = curl_easy_perform(c);
     
