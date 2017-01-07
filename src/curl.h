@@ -1,6 +1,8 @@
 #ifndef __HLS_DownLoad__curl__
 #define __HLS_DownLoad__curl__
 
+#include <stdbool.h>
+
 #define STRING 0x0001
 #define BINKEY 0x0002
 #define BINARY 0x0003
@@ -10,6 +12,11 @@
                    "Mobile/10A5355d Safari/8536.25"
 
 
-size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type);
+size_t get_data_from_url(char **url, char **str, uint8_t **bin, int type, bool update_url);
+
+void * init_http_session(void);
+long get_data_from_url_with_session(void **session, char **url, char **out, size_t *size, int type, bool update_url);
+long get_data_from_url_ext(char **url, char **out, size_t *size, int type, bool update_url);
+void clean_http_session(void *session);
 
 #endif /* defined(__HLS_DownLoad__curl__) */

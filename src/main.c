@@ -27,9 +27,15 @@ int main(int argc, const char * argv[])
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
     memset(&media_playlist, 0x00, sizeof(media_playlist));
-
-    if (get_data_from_url(hls_args.url, &hlsfile_source, NULL, STRING) == 0) {
-        MSG_ERROR("No result from server.\n");
+    char *url = strdup(hls_args.url);
+    size_t size = 0;
+    long http_code = get_data_from_url_ext(&url, &hlsfile_source, &size, STRING, true);
+    
+    
+    if (http_code != 200) {
+        MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
+    } else if (size == 0) {
+        MSG_API("{\"error_code\":-1, \"error_msg\":\"No result from server.\"}\n");
         return 1;
     }
 
@@ -38,7 +44,7 @@ int main(int argc, const char * argv[])
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
-        master_playlist.url = strdup(hls_args.url);
+        master_playlist.url = strdup(url);
         if (handle_hls_master_playlist(&master_playlist)) {
             return 1;
         }
@@ -95,13 +101,13 @@ int main(int argc, const char * argv[])
         if (download_hls(&media_playlist)) {
             return 1;
         }
-    }
-    else {
-        /* Live download */
-        
+    } else if (!media_playlist.is_endlist) {
+        if (download_live_hls(&media_playlist)) {
+            return 1;
+        }
     }
     
-    
+    free(url);
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();
     return 0;

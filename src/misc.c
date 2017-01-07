@@ -28,7 +28,7 @@ int parse_argv(int argc, const char *argv[])
         if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) {
             hls_args.loglevel++;
         } else if (!strcmp(argv[i], "-q") || !strcmp(argv[i], "--quiet")) {
-            hls_args.loglevel--;
+            hls_args.loglevel = -1;
         } else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--best")) {
             hls_args.use_best = 1;
         } else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
