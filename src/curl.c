@@ -17,6 +17,8 @@ struct http_session {
 struct MemoryStruct {
     char *memory;
     size_t size;
+    size_t reserved;
+    CURL *c;
 };
 
 static size_t
@@ -24,11 +26,32 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+    
+    if (mem->reserved == 0)
+    {
+        CURLcode res;
+        double filesize = 0.0;
 
-    mem->memory = realloc(mem->memory, mem->size + realsize + 1);
-    if (mem->memory == NULL) {
-        MSG_ERROR("not enough memory (realloc returned NULL)\n");
-        return 0;
+        res = curl_easy_getinfo(mem->c, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &filesize);
+        if((CURLE_OK == res) && (filesize>0.0))
+        {
+            mem->memory = realloc(mem->memory, (int)filesize + 2);
+            if (mem->memory == NULL) {
+                MSG_ERROR("not enough memory (realloc returned NULL)\n");
+                return 0;
+            }
+            mem->reserved = (int)filesize + 1;
+        }
+    }
+    
+    if ((mem->size + realsize + 1) > mem->reserved)
+    {
+        mem->memory = realloc(mem->memory, mem->size + realsize + 1);
+        mem->reserved = mem->size + realsize + 1;
+        if (mem->memory == NULL) {
+            MSG_ERROR("not enough memory (realloc returned NULL)\n");
+            return 0;
+        }
     }
 
     memcpy(&(mem->memory[mem->size]), contents, realsize);
@@ -64,7 +87,7 @@ void * set_user_agent_http_session(void *ptr_session, const char *user_agent)
     return session;
 }
 
-void * add_custom_header_http_session(void *ptr_session, const char *header)
+void add_custom_header_http_session(void *ptr_session, const char *header)
 {
     struct http_session *session = ptr_session;
     assert(session);
@@ -73,6 +96,13 @@ void * add_custom_header_http_session(void *ptr_session, const char *header)
         headers = curl_slist_append(headers, header);
         session->headers = headers;
     }
+}
+
+void set_fresh_connect_http_session(void *ptr_session, long val)
+{
+    struct http_session *session = ptr_session;
+    CURL *c = (CURL *)(session->handle);
+    curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);    
 }
 
 long get_data_from_url_with_session(void **ptr_session, char **url, char **out, size_t *size, int type, bool update_url)
@@ -95,11 +125,18 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
     struct MemoryStruct chunk;
 
     chunk.memory = malloc(1);
+    chunk.memory[0] = '\0';
     chunk.size = 0;
+    chunk.reserved = 0;
+    chunk.c = c; 
 
     curl_easy_setopt(c, CURLOPT_URL, *url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
+    curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 2L);
+    curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 3L); 
+    curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
+    
     if (session->user_agent) {
         curl_easy_setopt(c, CURLOPT_USERAGENT, session->user_agent);
     } else {

@@ -1,4 +1,7 @@
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
 #include <libavformat/avformat.h>
+#endif 
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -24,7 +27,9 @@ int main(int argc, const char * argv[])
     MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
 
     curl_global_init(CURL_GLOBAL_ALL);
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
     av_register_all();
+#endif
 
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;

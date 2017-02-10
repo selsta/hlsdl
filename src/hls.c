@@ -1,5 +1,9 @@
+
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#endif
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,9 +67,20 @@ int get_playlist_type(char *source)
 
 static int extend_url(char **url, const char *baseurl)
 {
+    static const char proxy_marker[] = "englandproxy.co.uk"; // ugly workaround to be fixed
+    static const char proxy_url[] = "http://www.englandproxy.co.uk/";
     size_t max_length = strlen(*url) + strlen(baseurl) + 10;
 
     if (!strncmp(*url, "http://", 7) || !strncmp(*url, "https://", 8)) {
+        
+        if (strstr(baseurl, proxy_marker) && !strstr(*url, proxy_marker)) {
+            max_length = strlen(*url) + strlen(proxy_url);
+            char *buffer = malloc(max_length);
+            snprintf(buffer, max_length, "%s%s", proxy_url, strstr(*url, "://") + 3);
+            *url = realloc(*url, strlen(buffer) + 1);
+            strcpy(*url, buffer);
+            free(buffer);
+        }
         return 0;
     }
 
@@ -387,6 +402,7 @@ void print_hls_master_playlist(struct hls_master_playlist *ma)
     }
 }
 
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
 static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
     // SAMPLE AES works by encrypting small segments (blocks).
@@ -597,6 +613,8 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     return 0;
 }
 
+#endif
+
 static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
     // The AES128 method encrypts whole segments.
@@ -724,7 +742,7 @@ static void *hls_playlist_update_thread(void *arg)
 
 int download_live_hls(struct hls_media_playlist *me)
 {
-    MSG_API("{\"download_type\":\"live\"}\n");
+    MSG_API("{\"d_t\":\"live\"}\n");
     
     char filename[MAX_FILENAME_LEN];
     if (hls_args.filename) {
@@ -817,8 +835,8 @@ int download_live_hls(struct hls_media_playlist *me)
     
     void *session = init_hls_session();
     int downloaded_duration = 0;
-    int total_duration = 0;
-    
+    int64_t download_size = 0;
+    time_t repTime = 0;
     bool download = true;
     while(download) {
         
@@ -834,7 +852,6 @@ int download_live_hls(struct hls_media_playlist *me)
             me->last_media_segment = NULL;
             download = !me->is_endlist;
         }
-        total_duration = me->total_duration;
         if (ms == NULL) {
             if (download) {
                 pthread_cond_signal(&media_playlist_refresh_cond);
@@ -863,13 +880,17 @@ int download_live_hls(struct hls_media_playlist *me)
                 
                 pthread_mutex_lock(&media_playlist_mtx);
                 first_media_sequence = me->first_media_sequence;
-                total_duration = me->total_duration;
                 pthread_mutex_unlock(&media_playlist_mtx);
                 
-                if(ms->sequence_number > first_media_sequence) {
+                if(http_code != 403 && ms->sequence_number > first_media_sequence) {
+                    clean_http_session(session);
                     sleep(1);
-                    MSG_WARNING("Live retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
-                    continue;
+                    session = init_hls_session();
+                    if (session) {
+                        set_fresh_connect_http_session(session, 1);
+                        MSG_WARNING("Live retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
+                        continue;
+                    }
                 }
                 else
                 {
@@ -879,14 +900,27 @@ int download_live_hls(struct hls_media_playlist *me)
             }
             
             downloaded_duration += ms->duration;
-            MSG_API("{\"t_duration\":%d,\"d_duration\":%d}\n", total_duration, downloaded_duration);
+            
             if (me->encryption == true && me->encryptiontype == ENC_AES128) {
                 decrypt_aes128(ms, &seg);
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
                 decrypt_sample_aes(ms, &seg);
+#else
+                MSG_API("{\"error_code\":-12, \"error_msg\":\"no_ffmpeg\"}\n");
+#endif
             }
-            fwrite(seg.data, 1, seg.len, pFile);
+            download_size += fwrite(seg.data, 1, seg.len, pFile);
             free(seg.data);
+            
+            set_fresh_connect_http_session(session, 0);
+            
+            time_t curRepTime = time(NULL);
+            if ((curRepTime - repTime) >= 1) {
+                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+                repTime = curRepTime;
+            }
+            
             break;
         } while(true);
         
@@ -900,7 +934,11 @@ int download_live_hls(struct hls_media_playlist *me)
     pthread_cond_destroy(&media_playlist_refresh_cond);
     pthread_cond_destroy(&media_playlist_empty_cond);
     
-    clean_http_session(session);
+    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+    if (session)
+    {
+        clean_http_session(session);
+    }
     fclose(pFile);
     return 0;
 }
@@ -908,8 +946,8 @@ int download_live_hls(struct hls_media_playlist *me)
 int download_hls(struct hls_media_playlist *me)
 {
     MSG_VERBOSE("Downloading segments.\n");
-    MSG_API("{\"download_type\":\"vod\"}\n");
-    MSG_API("{\"t_duration\":%d,\"d_duration\":0}\n", me->total_duration);
+    MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
+    MSG_API("{\"t_d\":%d,\"d_d\":0, \"d_s\":0}\n", me->total_duration); // t_d - total duration, d_d  - download duration, d_s - download size
 
     char filename[MAX_FILENAME_LEN];
     if (hls_args.filename) {
@@ -950,9 +988,10 @@ int download_hls(struct hls_media_playlist *me)
     int ret = 0;
     void *session = init_hls_session();
     assert(session);
-    
+    time_t repTime = 0;
     int retries = 0;
     int downloaded_duration = 0;
+    int64_t download_size = 0;
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms && ret == 0) {
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
@@ -966,32 +1005,52 @@ int download_hls(struct hls_media_playlist *me)
                 free(seg.data);
                 seg.data = NULL;
             }
-            if (retries <= hls_args.segment_download_retries) {
+            if (http_code != 403 && retries <= hls_args.segment_download_retries) {
+                clean_http_session(session);
                 sleep(1);
-                MSG_WARNING("VOD retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
-                retries += 1;
-                continue;
+                session = init_hls_session();
+                if (session) {
+                    set_fresh_connect_http_session(session, 1);
+                    MSG_WARNING("VOD retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
+                    retries += 1;
+                    continue;
+                }
             }
             ret = 1;
-            MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
+            MSG_API("{\"error_code\":%d, \"error_msg\":\"http\"}\n", (int)http_code);
             break;
         } else {
+            time_t curRepTime = time(NULL);
             downloaded_duration += ms->duration;
-            MSG_API("{\"t_duration\":%d,\"d_duration\":%d}\n", me->total_duration, downloaded_duration);
+            set_fresh_connect_http_session(session, 0);
             if (me->encryption == true && me->encryptiontype == ENC_AES128) {
                 decrypt_aes128(ms, &seg);
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
                 decrypt_sample_aes(ms, &seg);
+#else
+                MSG_API("{\"error_code\":-12, \"error_msg\":\"no_ffmpeg\"}\n");
+#endif
             }
-            fwrite(seg.data, 1, seg.len, pFile);
+            download_size += fwrite(seg.data, 1, seg.len, pFile);
             free(seg.data);
+            
+            if ((curRepTime - repTime) >= 1) {
+                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+                repTime = curRepTime;
+            }
         }
         
         retries = 0;
         ms = ms->next;
     }
     
-    clean_http_session(session);
+    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+    
+    if (session)
+    {
+        clean_http_session(session);
+    }
     fclose(pFile);
     return ret;
 }
