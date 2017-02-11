@@ -103,16 +103,18 @@ static int extend_url(char **url, const char *baseurl)
     
     else {
         // URLs can have '?'. To make /../ work, remove it.
-        char *find_questionmark = strchr(baseurl, '?');
+        char *domain = strdup(baseurl);
+        char *find_questionmark = strchr(domain, '?');
         if (find_questionmark) {
             *find_questionmark = '\0';
         }
 
         char *buffer = malloc(max_length);
-        snprintf(buffer, max_length, "%s/../%s", baseurl, *url);
+        snprintf(buffer, max_length, "%s/../%s", domain, *url);
         *url = realloc(*url, strlen(buffer) + 1);
         strcpy(*url, buffer);
         free(buffer);
+        free(domain);
         return 0;
     }
 }
@@ -127,7 +129,7 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
         enc_type = ENC_AES_SAMPLE;
     } else  {
         if (!strncmp(tag, "#EXTINF:", 8)){
-            if(sscanf(tag+8, "%d",  &(ms->duration)) == 1){
+            if(sscanf(tag+8, "%f",  &(ms->duration)) == 1){
                 return 0;
             }
         } else if (!strncmp(tag, "#EXT-X-ENDLIST", 14)){
@@ -288,9 +290,9 @@ finish:
     return 0;
 }
 
-static int get_duration_hls_media_playlist(struct hls_media_playlist *me)
+static float get_duration_hls_media_playlist(struct hls_media_playlist *me)
 {
-    int duration = 0;
+    float duration = 0.0;
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms) {
         duration += ms->duration;
@@ -305,7 +307,7 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     me->encryptiontype = ENC_NONE;
     
     size_t size = 0;
-    long http_code = get_hls_data_from_url(&me->url, &me->source, &size, STRING, true);
+    long http_code = get_hls_data_from_url(&me->url, &me->source, &size, STRING, false);
     if (200 != http_code || get_playlist_type(me->source) != MEDIA_PLAYLIST) {
         return 1;
     }
@@ -671,7 +673,9 @@ static void *hls_playlist_update_thread(void *arg)
         new_me.url = strdup(url);
         
         size_t size = 0;
-        long http_code = get_data_from_url_with_session(&session, &new_me.url, &new_me.source, &size, STRING, false);
+        printf("before [%s]\n", new_me.url);
+        long http_code = get_data_from_url_with_session(&session, &new_me.url, &new_me.source, &size, STRING, true);
+        printf("after [%s]\n", new_me.url);
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
             if (new_me.is_endlist || 
@@ -834,7 +838,7 @@ int download_live_hls(struct hls_media_playlist *me)
     pthread_create(&thread, NULL, hls_playlist_update_thread, &updater_params);
     
     void *session = init_hls_session();
-    int downloaded_duration = 0;
+    float downloaded_duration = 0;
     int64_t download_size = 0;
     time_t repTime = 0;
     bool download = true;
@@ -917,7 +921,7 @@ int download_live_hls(struct hls_media_playlist *me)
             
             time_t curRepTime = time(NULL);
             if ((curRepTime - repTime) >= 1) {
-                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", (int)me->total_duration, (int)downloaded_duration, download_size);
                 repTime = curRepTime;
             }
             
@@ -934,7 +938,7 @@ int download_live_hls(struct hls_media_playlist *me)
     pthread_cond_destroy(&media_playlist_refresh_cond);
     pthread_cond_destroy(&media_playlist_empty_cond);
     
-    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", (int)me->total_duration, (int)downloaded_duration, download_size);
     if (session)
     {
         clean_http_session(session);
@@ -947,7 +951,7 @@ int download_hls(struct hls_media_playlist *me)
 {
     MSG_VERBOSE("Downloading segments.\n");
     MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
-    MSG_API("{\"t_d\":%d,\"d_d\":0, \"d_s\":0}\n", me->total_duration); // t_d - total duration, d_d  - download duration, d_s - download size
+    MSG_API("{\"t_d\":%d,\"d_d\":0, \"d_s\":0}\n", (int)me->total_duration); // t_d - total duration, d_d  - download duration, d_s - download size
 
     char filename[MAX_FILENAME_LEN];
     if (hls_args.filename) {
@@ -990,7 +994,7 @@ int download_hls(struct hls_media_playlist *me)
     assert(session);
     time_t repTime = 0;
     int retries = 0;
-    int downloaded_duration = 0;
+    float downloaded_duration = 0;
     int64_t download_size = 0;
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms && ret == 0) {
@@ -1036,7 +1040,7 @@ int download_hls(struct hls_media_playlist *me)
             free(seg.data);
             
             if ((curRepTime - repTime) >= 1) {
-                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+                MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", (int)me->total_duration, (int)downloaded_duration, download_size);
                 repTime = curRepTime;
             }
         }
@@ -1045,7 +1049,7 @@ int download_hls(struct hls_media_playlist *me)
         ms = ms->next;
     }
     
-    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", me->total_duration, downloaded_duration, download_size);
+    MSG_API("{\"t_d\":%d,\"d_d\":%d,\"d_s\":%lld}\n", (int)me->total_duration, (int)downloaded_duration, download_size);
     
     if (session)
     {

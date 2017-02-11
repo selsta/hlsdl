@@ -1,4 +1,7 @@
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
 #include <libavformat/avformat.h>
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -112,9 +115,11 @@ int64_t seek(void *opaque, int64_t offset, int whence)
         case SEEK_END:
             bb->pos = (int)(bb->len - offset);
             break;
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
         case AVSEEK_SIZE:
             return bb->len;
             break;
+#endif
     }
     return bb->pos;
 }

@@ -26,7 +26,7 @@ struct enc_aes128 {
 struct hls_media_segment {
     char *url;
     int sequence_number;
-    int duration;
+    float duration;
     struct enc_aes128 enc_aes;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;
@@ -37,7 +37,7 @@ struct hls_media_playlist {
     char *source;
     unsigned int bitrate;
     int target_duration;
-    int total_duration;
+    float total_duration;
     bool is_endlist;
     bool encryption;
     int encryptiontype;
