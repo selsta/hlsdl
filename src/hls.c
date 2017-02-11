@@ -25,6 +25,10 @@ static void set_hls_http_header(void *session)
         set_user_agent_http_session(session, hls_args.user_agent);
     }
     
+    if (hls_args.proxy_uri) {
+        set_proxy_uri_http_session(session, hls_args.proxy_uri);
+    }
+    
     for (int i=0; i<HLSDL_MAX_NUM_OF_CUSTOM_HEADERS; ++i) {
         if (hls_args.custom_headers[i]) {
             add_custom_header_http_session(session, hls_args.custom_headers[i]);

@@ -12,6 +12,7 @@ struct http_session {
     void *handle;
     void *headers;
     char *user_agent;
+    char *proxy_uri;
 };
 
 struct MemoryStruct {
@@ -87,6 +88,21 @@ void * set_user_agent_http_session(void *ptr_session, const char *user_agent)
     return session;
 }
 
+void * set_proxy_uri_http_session(void *ptr_session, const char *proxy_uri)
+{
+    struct http_session *session = ptr_session;
+    assert(session);
+    
+    if (proxy_uri) {
+        if (session->proxy_uri) {
+            free(session->proxy_uri);
+        }
+        session->proxy_uri = strdup(proxy_uri);
+    }
+    
+    return session;
+}
+
 void add_custom_header_http_session(void *ptr_session, const char *header)
 {
     struct http_session *session = ptr_session;
@@ -146,6 +162,10 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
     }
     
+    if (session->proxy_uri) {
+        curl_easy_setopt(c, CURLOPT_PROXY, session->proxy_uri);
+    }
+    
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
 
     res = curl_easy_perform(c);
@@ -194,6 +214,11 @@ void clean_http_session(void *ptr_session)
     /* free user agent if set */ 
     if (session->user_agent) {
         free(session->user_agent);
+    }
+    
+    /* free user agent if set */ 
+    if (session->proxy_uri) {
+        free(session->proxy_uri);
     }
     
     /* free the custom headers if set */ 

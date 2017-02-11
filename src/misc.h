@@ -27,6 +27,7 @@ struct hls_args {
     char *filename;
     char *url;
     char *user_agent;
+    char *proxy_uri;
     char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
 };
 

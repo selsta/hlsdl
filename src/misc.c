@@ -14,7 +14,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.01\n");
+    printf("hlsdl v0.02\n");
     printf("(c) 2017 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -22,6 +22,7 @@ static void print_help(const char *filename)
            "-o ... Choose name of output file.\n"
            "-u ... Set custom HTTP User-Agent header\n"
            "-h ... Set custom HTTP header.\n"
+           "-p ... Set proxy uri.\n"
            "-f ... Force overwriting the output file.\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
@@ -67,6 +68,9 @@ int parse_argv(int argc, const char *argv[])
             break;
         case 'u':
             hls_args.user_agent = optarg;
+            break;
+        case 'p':
+            hls_args.proxy_uri = optarg;
             break;
         default:
             MSG_ERROR("?? getopt returned character code 0%o ??\n", c);
