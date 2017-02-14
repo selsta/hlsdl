@@ -677,9 +677,7 @@ static void *hls_playlist_update_thread(void *arg)
         new_me.url = strdup(url);
         
         size_t size = 0;
-        printf("before [%s]\n", new_me.url);
         long http_code = get_data_from_url_with_session(&session, &new_me.url, &new_me.source, &size, STRING, true);
-        printf("after [%s]\n", new_me.url);
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
             if (new_me.is_endlist || 
