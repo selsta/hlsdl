@@ -13,6 +13,8 @@
 #include <pthread.h>
 #include <time.h>
 
+#include <sys/prctl.h>
+
 #include "curl.h"
 #include "hls.h"
 #include "msg.h"
@@ -76,7 +78,6 @@ static int extend_url(char **url, const char *baseurl)
     size_t max_length = strlen(*url) + strlen(baseurl) + 10;
 
     if (!strncmp(*url, "http://", 7) || !strncmp(*url, "https://", 8)) {
-        
         if (strstr(baseurl, proxy_marker) && !strstr(*url, proxy_marker)) {
             max_length = strlen(*url) + strlen(proxy_url);
             char *buffer = malloc(max_length);
@@ -133,9 +134,8 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
         enc_type = ENC_AES_SAMPLE;
     } else  {
         if (!strncmp(tag, "#EXTINF:", 8)){
-            if(sscanf(tag+8, "%f",  &(ms->duration)) == 1){
-                return 0;
-            }
+            ms->duration = (float)atof(tag+8);
+            return 0;
         } else if (!strncmp(tag, "#EXT-X-ENDLIST", 14)){
             me->is_endlist = true;
             return 0;
@@ -210,6 +210,8 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     struct hls_media_segment *curr_ms = NULL;
     char *src = me->source;
     
+    MSG_PRINT("> START media_playlist_get_links\n");
+    
     int i = 0;
     while(src != NULL){
         if (ms == NULL)
@@ -238,9 +240,8 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
             if (end_ptr != NULL) {
                 int url_size = (int)(end_ptr - src) + 1;
                 ms->url = malloc(url_size);
-                memset(ms->url, 0x00, url_size);
                 strncpy(ms->url, src, url_size-1);
-                
+                ms->url[url_size-1] = '\0';
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
                     if (me->enc_aes.iv_is_static == false) {
@@ -290,6 +291,8 @@ finish:
         }
         free(ms);
     }
+    
+    MSG_PRINT("> END media_playlist_get_links\n");
     
     return 0;
 }
@@ -635,6 +638,11 @@ static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
 
 static void *hls_playlist_update_thread(void *arg)
 {
+    char threadname[50];
+    strncpy(threadname, __func__, sizeof(threadname));
+    threadname[49] = '\0';
+    prctl(PR_SET_NAME, (unsigned long)&threadname);
+    
     hls_playlist_updater_params *updater_params = arg;
     
     struct hls_media_playlist *me = updater_params->media_playlist;
@@ -677,7 +685,9 @@ static void *hls_playlist_update_thread(void *arg)
         new_me.url = strdup(url);
         
         size_t size = 0;
+        MSG_PRINT("> START DOWNLOAD LIST\n");
         long http_code = get_data_from_url_with_session(&session, &new_me.url, &new_me.source, &size, STRING, true);
+        MSG_PRINT("> END DOWNLOAD LIST\n");
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
             if (new_me.is_endlist || 

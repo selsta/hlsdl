@@ -153,6 +153,9 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
     curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 3L); 
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     
+    /* enable all supported built-in compressions */
+    curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "");
+    
     if (session->user_agent) {
         curl_easy_setopt(c, CURLOPT_USERAGENT, session->user_agent);
     } else {
