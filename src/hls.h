@@ -2,6 +2,7 @@
 #define __HLS_DownLoad__hls__
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define MASTER_PLAYLIST 0
 #define MEDIA_PLAYLIST 1
@@ -26,7 +27,7 @@ struct enc_aes128 {
 struct hls_media_segment {
     char *url;
     int sequence_number;
-    float duration;
+    uint64_t duration_ms;
     struct enc_aes128 enc_aes;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;
@@ -36,8 +37,8 @@ struct hls_media_playlist {
     char *url;
     char *source;
     unsigned int bitrate;
-    int target_duration;
-    float total_duration;
+    uint64_t target_duration_ms;
+    uint64_t total_duration_ms;
     bool is_endlist;
     bool encryption;
     int encryptiontype;
