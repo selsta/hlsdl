@@ -9,7 +9,7 @@ S_OBJS=	$(S_SRC:.c=.o)
 
 CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
-CFLAGS+=-Wsign-compare -Iincludes -g
+CFLAGS+=-Wsign-compare -Iincludes
 CFLAGS+=-DPREFIX='"$(PREFIX)"'
 LDFLAGS+=-lpthread -lcurl
 
