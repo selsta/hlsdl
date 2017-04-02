@@ -130,16 +130,15 @@ static int extend_url(char **url, const char *baseurl)
     else if (**url == '/') {
         char *domain = malloc(max_length);
         strcpy(domain, baseurl);
-
-        if (!sscanf(baseurl, "http://%[^/]", domain)) {
-            sscanf(baseurl, "https://%[^/]", domain);
+        char proto[6];
+        if( 2 == sscanf(baseurl, "%5[^:]://%[^/]", proto, domain))
+        {
+            char *buffer = malloc(max_length);
+            snprintf(buffer, max_length, "%s://%s%s", proto, domain, *url);
+            *url = realloc(*url, strlen(buffer) + 1);
+            strcpy(*url, buffer);
+            free(buffer);
         }
-
-        char *buffer = malloc(max_length);
-        snprintf(buffer, max_length, "%s%s", domain, *url);
-        *url = realloc(*url, strlen(buffer) + 1);
-        strcpy(*url, buffer);
-        free(buffer);
         free(domain);
         return 0;
     }
