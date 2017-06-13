@@ -228,6 +228,8 @@ void clean_http_session(void *ptr_session)
     if (session->headers) {
         curl_slist_free_all(session->headers);
     }
+    
+    free(session);
 }
 
 size_t get_data_from_url(char **url, char **str, uint8_t **bin, int type, bool update_url)

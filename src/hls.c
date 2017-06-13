@@ -201,24 +201,14 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
         str_to_bin(iv_bin, iv_str, KEYLEN);
         memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
         me->enc_aes.iv_is_static = true;
+        
+        extend_url(&link_to_key, me->url);
+        
+        free(me->enc_aes.key_url);
+        me->enc_aes.key_url = strdup(link_to_key);
         free(iv_bin);
     }
-        
-    extend_url(&link_to_key, me->url);
-
-    char *decrypt;
-    size_t size = 0;
-    long http_code = get_hls_data_from_url(&link_to_key, &decrypt, &size, BINKEY, false);
-    
-    if (http_code != 200 || size == 0) {
-        MSG_ERROR("Getting key-file failed.\n");
-        free(link_to_key);
-        return 1;
-    }
-
-    memcpy(me->enc_aes.key_value, decrypt, KEYLEN);
     free(link_to_key);
-    free(decrypt);
     return 0;
 }
 
@@ -280,6 +270,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 ms->url[url_size-1] = '\0';
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
+                    ms->enc_aes.key_url = strdup(me->enc_aes.key_url);
                     if (me->enc_aes.iv_is_static == false) {
                         char iv_str[STRLEN_BTS(KEYLEN)];
                         snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms->sequence_number);
@@ -321,12 +312,7 @@ finish:
         me->last_media_sequence = me->first_media_sequence + i - 1;
     }
     
-    if (ms != NULL) {
-        if (ms->url != NULL) {
-            free(ms->url);
-        }
-        free(ms);
-    }
+    media_segment_cleanup(ms);
     
     MSG_PRINT("> END media_playlist_get_links\n");
     
@@ -549,6 +535,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
 
             while (bytes_remaining(p_frame, (audio_frame + pkt.size)) >= 16 ) {
                 uint8_t *dec_tmp = malloc(16);
+                fill_key_value(&(s->enc_aes));
                 AES128_CBC_decrypt_buffer(dec_tmp, p_frame, 16, s->enc_aes.key_value, packet_iv);
 
                 // CBC requires the unencrypted data from the previous
@@ -614,6 +601,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                     block++;
                     if (block == 1) {
                         uint8_t *output = malloc(16);
+                        fill_key_value(&(s->enc_aes));
                         AES128_CBC_decrypt_buffer(output, p, 16, s->enc_aes.key_value, packet_iv);
 
                         // CBC requires the unencrypted data from the previous
@@ -665,6 +653,7 @@ static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
     // The AES128 method encrypts whole segments.
     // Simply decrypting them is enough.
     uint8_t *db = malloc(buf->len);
+    fill_key_value(&(s->enc_aes));
     AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len,
                               s->enc_aes.key_value, s->enc_aes.iv_value);
     memcpy(buf->data, db, buf->len);
@@ -870,8 +859,7 @@ int download_live_hls(struct hls_media_playlist *me)
             while (me->first_media_segment != ms) {
                 struct hls_media_segment *tmp_ms = me->first_media_segment;
                 me->first_media_segment = me->first_media_segment->next;
-                free(tmp_ms->url);
-                free(tmp_ms);
+                media_segment_cleanup(tmp_ms);
             }
             ms->prev = NULL;
             me->first_media_segment = ms;
@@ -977,8 +965,7 @@ int download_live_hls(struct hls_media_playlist *me)
             break;
         } while(true);
         
-        free(ms->url);
-        free(ms);
+        media_segment_cleanup(ms);
     }
     
     pthread_join(thread, &ret);
@@ -1113,6 +1100,7 @@ int print_enc_keys(struct hls_media_playlist *me)
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms) {
         if (me->encryption == true) {
+            fill_key_value(&(ms->enc_aes));
             MSG_PRINT("[AES-128]KEY: 0x");
             for(size_t count = 0; count < KEYLEN; count++) {
                 MSG_PRINT("%02x", ms->enc_aes.key_value[count]);
@@ -1128,16 +1116,26 @@ int print_enc_keys(struct hls_media_playlist *me)
     return 0;
 }
 
+void media_segment_cleanup(struct hls_media_segment *ms)
+{
+    if (ms)
+    {
+        free(ms->url);
+        free(ms->enc_aes.key_url);
+        free(ms);
+    }
+}
+
 void media_playlist_cleanup(struct hls_media_playlist *me)
 {
     struct hls_media_segment *ms = me->first_media_segment;
     free(me->source);
     free(me->url);
+    free(me->enc_aes.key_url);
     
     while(ms){
         me->first_media_segment = ms->next;
-        free(ms->url);
-        free(ms);
+        media_segment_cleanup(ms);
         ms = me->first_media_segment;
     }
     assert(me->first_media_segment == NULL);
@@ -1149,4 +1147,26 @@ void master_playlist_cleanup(struct hls_master_playlist *ma)
     free(ma->source);
     free(ma->url);
     free(ma->media_playlist);
+}
+
+int fill_key_value(struct enc_aes128 *es)
+{
+    if (es && es->key_url)
+    {
+        char *decrypt;
+        size_t size = 0;
+        long http_code = get_hls_data_from_url(&es->key_url, &decrypt, &size, BINKEY, false);
+        
+        if (http_code != 200 || size == 0) {
+            MSG_ERROR("Getting key-file failed.\n");
+            return 1;
+        }
+
+        memcpy(es->key_value, decrypt, KEYLEN);
+        free(es->key_url);
+        es->key_url = NULL;
+        free(decrypt);
+    }
+    
+    return 0;
 }

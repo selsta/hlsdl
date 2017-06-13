@@ -22,6 +22,7 @@ struct enc_aes128 {
     bool iv_is_static;
     uint8_t iv_value[KEYLEN];
     uint8_t key_value[KEYLEN];
+    char *key_url;
 };
 
 struct hls_media_segment {
@@ -74,7 +75,9 @@ int print_enc_keys(struct hls_media_playlist *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(struct hls_media_playlist *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
+void media_segment_cleanup(struct hls_media_segment *ms);
 void add_media_segment(struct hls_media_playlist *me);
+int fill_key_value(struct enc_aes128 *es);
 
 long get_hls_data_from_url(char **url, char **out, size_t *size, int type, bool update_url);
 
