@@ -198,17 +198,19 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
     if ((sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0 ||
          sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0))
     {
-        uint8_t *iv_bin = malloc(KEYLEN);
-        
-        str_to_bin(iv_bin, iv_str, KEYLEN);
-        memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
-        me->enc_aes.iv_is_static = true;
+        if (sep == 'x' || sep == 'X')
+        {
+            uint8_t *iv_bin = malloc(KEYLEN);
+            str_to_bin(iv_bin, iv_str, KEYLEN);
+            memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
+            me->enc_aes.iv_is_static = true;
+            free(iv_bin);
+        }
         
         extend_url(&link_to_key, me->url);
         
         free(me->enc_aes.key_url);
         me->enc_aes.key_url = strdup(link_to_key);
-        free(iv_bin);
     }
     free(link_to_key);
     return 0;
