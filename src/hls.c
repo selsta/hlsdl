@@ -192,12 +192,14 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
     me->enc_aes.iv_is_static = false;
         
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
-    char iv_str[STRLEN_BTS(KEYLEN)];
-        
-    if (sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2 ||
-        sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0x%s", link_to_key, iv_str) == 2)
+    char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
+    char sep = '\0';
+    
+    if ((sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0 ||
+         sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0))
     {
         uint8_t *iv_bin = malloc(KEYLEN);
+        
         str_to_bin(iv_bin, iv_str, KEYLEN);
         memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
         me->enc_aes.iv_is_static = true;
@@ -270,6 +272,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 ms->url[url_size-1] = '\0';
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
+                    memcpy(ms->enc_aes.iv_value, me->enc_aes.iv_value, KEYLEN);
                     ms->enc_aes.key_url = strdup(me->enc_aes.key_url);
                     if (me->enc_aes.iv_is_static == false) {
                         char iv_str[STRLEN_BTS(KEYLEN)];
@@ -653,10 +656,12 @@ static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
     // The AES128 method encrypts whole segments.
     // Simply decrypting them is enough.
     uint8_t *db = malloc(buf->len);
+    
     fill_key_value(&(s->enc_aes));
     AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len,
                               s->enc_aes.key_value, s->enc_aes.iv_value);
     memcpy(buf->data, db, buf->len);
+    
     free(db);
     return 0;
 }
@@ -1158,7 +1163,7 @@ int fill_key_value(struct enc_aes128 *es)
         long http_code = get_hls_data_from_url(&es->key_url, &decrypt, &size, BINKEY, false);
         
         if (http_code != 200 || size == 0) {
-            MSG_ERROR("Getting key-file failed.\n");
+            MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
             return 1;
         }
 
