@@ -9,8 +9,20 @@ cd /mnt/new2/sysroots
 
 source supportedPlatforms.sh
 
-OUTDIR=$MYTOPDIR/out
-rm -rf $OUTDIR/hlsdl_${EPLATFORM}_static_curl_openssl.${OPENSSL_VER}
+EPLATFORM_MAIN="${EPLATFORM%%_*}"
+if [ "$EPLATFORM_MAIN" != "$EPLATFORM" ]
+then
+    EPLATFORM_VARIANT="_${EPLATFORM#*_}"
+    #EPLATFORM_VARIANT="_${EPLATFORM##*_}"
+else
+    EPLATFORM_VARIANT=""
+fi
+
+OUTDIR=$MYTOPDIR/out/$EPLATFORM_MAIN
+mkdir -p $OUTDIR
+BINARY_NAME="hlsdl${EPLATFORM_VARIANT}_static_curl_openssl.${OPENSSL_VER}"
+
+rm -rf $OUTDIR/$BINARY_NAME
 mkdir -p $OUTDIR
 
 if [ "${TOOLCHAIN_NAME}" != "" ];
@@ -22,5 +34,6 @@ else
     STRIP="strip"
 fi
 
-$CC -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/hlsdl_${EPLATFORM}_static_curl_openssl.${OPENSSL_VER}
-$STRIP -s $OUTDIR/hlsdl_${EPLATFORM}_static_curl_openssl.${OPENSSL_VER}
+#-O0 -g 
+$CC -O2 -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/$BINARY_NAME
+$STRIP -s $OUTDIR/$BINARY_NAME

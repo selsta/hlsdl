@@ -1158,21 +1158,47 @@ void master_playlist_cleanup(struct hls_master_playlist *ma)
 
 int fill_key_value(struct enc_aes128 *es)
 {
+    /* temporary we will create cache with keys url here
+     * this will make this function thread unsafe but at now
+     * it is not problem because it is used only from one thread
+     * 
+     * last allocation of cache_key_url will not be free
+     * but this is not big problem since this code is run 
+     * as standalone process 
+     *(system will free all memory allocated by process at it exit).
+     *
+     * But this must be fixed for clear valgrind memory leak detection.
+     */
+    static char cache_key_value[KEYLEN] = "";
+    static char *cache_key_url = NULL; 
+    
     if (es && es->key_url)
     {
-        char *decrypt;
-        size_t size = 0;
-        long http_code = get_hls_data_from_url(&es->key_url, &decrypt, &size, BINKEY, false);
-        
-        if (http_code != 200 || size == 0) {
-            MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
-            return 1;
+        if (cache_key_url && 0 == strcmp(cache_key_url, es->key_url))
+        {
+            memcpy(es->key_value, cache_key_value, KEYLEN);
         }
+        else
+        {
+            char *key_value = NULL;
+            size_t size = 0;
+            long http_code = get_hls_data_from_url(&es->key_url, &key_value, &size, BINKEY, false);
+            
+            if (http_code != 200 || size == 0) {
+                MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
+                return 1;
+            }
 
-        memcpy(es->key_value, decrypt, KEYLEN);
+            memcpy(es->key_value, key_value, KEYLEN);
+            free(key_value);
+            
+            free(cache_key_url);
+            cache_key_url = strdup(es->key_url);
+            memcpy(cache_key_value, es->key_value, KEYLEN);
+        }
+        
         free(es->key_url);
         es->key_url = NULL;
-        free(decrypt);
     }
     
     return 0;
