@@ -15,9 +15,9 @@ void * init_http_session(void);
 void * set_user_agent_http_session(void *ptr_session, const char *user_agent);
 void * set_proxy_uri_http_session(void *ptr_session, const char *proxy_uri);
 void add_custom_header_http_session(void *ptr_session, const char *header);
-long get_data_from_url_with_session(void **session, char **url, char **out, size_t *size, int type, bool update_url);
+long get_data_from_url_with_session(void **session, char *url, char **out, size_t *size, int type, char **new_url);
 void clean_http_session(void *session);
-size_t get_data_from_url(char **url, char **str, uint8_t **bin, int type, bool update_url);
+size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **new_url);
 void set_fresh_connect_http_session(void *ptr_session, long val);
 
 #endif /* defined(__HLS_DownLoad__curl__) */

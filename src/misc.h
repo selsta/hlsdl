@@ -22,8 +22,10 @@ struct hls_args {
     int force_overwrite;
     int dump_ts_urls;
     int dump_dec_cmd;
+    int live_start_offset_sec;
+    int refresh_delay_sec;
     int segment_download_retries;
-    int live_start_offset;
+    int open_max_retries;
     char *filename;
     char *url;
     char *user_agent;

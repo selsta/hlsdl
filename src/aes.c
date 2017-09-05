@@ -49,7 +49,7 @@ static const uint8_t* Key;
 
 #if defined(CBC) && CBC
   // Initial Vector used only for CBC mode
-  static uint8_t* Iv;
+  static uint8_t *Iv;
 #endif
 
 // The lookup-tables are marked const so they can be placed in read-only storage instead of RAM

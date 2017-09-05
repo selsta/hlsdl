@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <curl/curl.h>
 #include "curl.h"
 #include "hls.h"
@@ -17,7 +18,10 @@ int main(int argc, const char * argv[])
     memset(&hls_args, 0x00, sizeof(hls_args));
     hls_args.loglevel = 1;
     hls_args.segment_download_retries = HLSDL_MAX_RETRIES;
-    hls_args.live_start_offset = HLSDL_LIVE_START_OFFSET;
+    hls_args.live_start_offset_sec = HLSDL_LIVE_START_OFFSET_SEC;
+    hls_args.open_max_retries = HLSDL_OPEN_MAX_RETRIES;
+    hls_args.refresh_delay_sec = -1;
+    
 
     if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");
@@ -34,10 +38,20 @@ int main(int argc, const char * argv[])
     char *hlsfile_source;
     struct hls_media_playlist media_playlist;
     memset(&media_playlist, 0x00, sizeof(media_playlist));
-    char *url = strdup(hls_args.url);
+    char *url = NULL;
     size_t size = 0;
-    long http_code = get_hls_data_from_url(&url, &hlsfile_source, &size, STRING, true);
-    
+    long http_code = 0;
+    int tries = hls_args.open_max_retries;
+    while (tries) {
+        http_code = get_hls_data_from_url(hls_args.url, &hlsfile_source, &size, STRING, &url);
+        if (200 != http_code || size == 0) {
+            MSG_ERROR("%s %d tries[%d]\n", hls_args.url, (int)http_code, (int)tries);
+            --tries;
+            sleep(1);
+            continue;
+        }
+        break;
+    }
     
     if (http_code != 200) {
         MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
@@ -51,7 +65,8 @@ int main(int argc, const char * argv[])
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
         master_playlist.source = hlsfile_source;
-        master_playlist.url = strdup(url);
+        master_playlist.url = url;
+        url = NULL;
         if (handle_hls_master_playlist(&master_playlist)) {
             return 1;
         }
@@ -76,13 +91,18 @@ int main(int argc, const char * argv[])
         }
         media_playlist = master_playlist.media_playlist[quality_choice];
         master_playlist_cleanup(&master_playlist);
+        media_playlist.orig_url = strdup(media_playlist.url);
+        
     } else if (playlist_type == MEDIA_PLAYLIST) {
+        media_playlist.source = hlsfile_source;
         media_playlist.bitrate = 0;
-        media_playlist.url = strdup(hls_args.url);
+        media_playlist.orig_url = strdup(hls_args.url);
+        media_playlist.url      = url;
+        url = NULL;
     } else {
         return 1;
     }
-
+    
     if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }

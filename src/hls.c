@@ -87,10 +87,10 @@ static void * init_hls_session(void)
     return session;
 }
 
-long get_hls_data_from_url(char **url, char **out, size_t *size, int type, bool update_url)
+long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url)
 {
     void *session = init_hls_session();
-    long http_code = get_data_from_url_with_session(&session, url, out, size, type, update_url);
+    long http_code = get_data_from_url_with_session(&session, url, out, size, type, new_url);
     clean_http_session(session);
     return http_code;
 }
@@ -340,11 +340,23 @@ int handle_hls_media_playlist(struct hls_media_playlist *me)
     me->encryption = false;
     me->encryptiontype = ENC_NONE;
     
-    size_t size = 0;
-    long http_code = get_hls_data_from_url(&me->url, &me->source, &size, STRING, false);
-    if (200 != http_code || get_playlist_type(me->source) != MEDIA_PLAYLIST) {
-        return 1;
+    if (!me->source) {
+        size_t size = 0;
+        long http_code = 0;
+        int tries = hls_args.open_max_retries;
+            
+        while (tries) {
+            http_code = get_hls_data_from_url(me->orig_url, &me->source, &size, STRING, &me->url);
+            if (200 != http_code || size == 0) {
+                MSG_ERROR("%s %d tries[%d]\n", me->orig_url, (int)http_code, (int)tries);
+                --tries;
+                sleep(1);
+                continue;
+            }
+            break;
+        }
     }
+    
     me->first_media_segment = NULL;
     me->last_media_segment = NULL;
     me->target_duration_ms = 0;
@@ -691,14 +703,17 @@ static void *hls_playlist_update_thread(void *arg)
     // no lock is needed here because download_live_hls not change this fields
     //pthread_mutex_lock(media_playlist_mtx);
     is_endlist = me->is_endlist;
-    url = strdup(me->url);
-    refresh_delay_s = me->target_duration_ms / 1000;
-    //pthread_mutex_unlock(media_playlist_mtx);
-    
-    if (refresh_delay_s > HLSDL_MAX_REFRESH_DELAY) {
-        refresh_delay_s = HLSDL_MAX_REFRESH_DELAY;
-    } else if (refresh_delay_s < HLSDL_MIN_REFRESH_DELAY) {
-        refresh_delay_s = HLSDL_MIN_REFRESH_DELAY;
+    if (hls_args.refresh_delay_sec < 0) {
+        refresh_delay_s = me->target_duration_ms / 1000;
+        //pthread_mutex_unlock(media_playlist_mtx);
+        
+        if (refresh_delay_s > HLSDL_MAX_REFRESH_DELAY_SEC) {
+            refresh_delay_s = HLSDL_MAX_REFRESH_DELAY_SEC;
+        } else if (refresh_delay_s < HLSDL_MIN_REFRESH_DELAY_SEC) {
+            refresh_delay_s = HLSDL_MIN_REFRESH_DELAY_SEC;
+        }
+    } else {
+        refresh_delay_s = hls_args.refresh_delay_sec;
     }
     
     struct timespec ts;
@@ -714,11 +729,10 @@ static void *hls_playlist_update_thread(void *arg)
         // update playlist
         struct hls_media_playlist new_me;
         memset(&new_me, 0x00, sizeof(new_me));
-        new_me.url = strdup(url);
         
         size_t size = 0;
-        MSG_PRINT("> START DOWNLOAD LIST\n");
-        long http_code = get_data_from_url_with_session(&session, &new_me.url, &new_me.source, &size, STRING, true);
+        MSG_PRINT("> START DOWNLOAD LIST url[%s]\n", me->url);
+        long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url));
         MSG_PRINT("> END DOWNLOAD LIST\n");
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
@@ -778,13 +792,18 @@ static void *hls_playlist_update_thread(void *arg)
                 pthread_mutex_unlock(media_playlist_mtx);
             }
         } else {
-            MSG_WARNING("Fail to update playlist \"%s\". http_code[%d].\n", new_me.url, (int)http_code);
+            MSG_WARNING("Fail to update playlist \"%s\". http_code[%d].\n", me->url, (int)http_code);
+            clean_http_session(session);
+            sleep(1);
+            session = init_hls_session();
+            if (session) {
+                set_fresh_connect_http_session(session, 1);
+            }
         }
         media_playlist_cleanup(&new_me);
     }
     
     clean_http_session(session);
-    free(url);
     pthread_exit(NULL);
 }
 
@@ -852,7 +871,7 @@ int download_live_hls(struct hls_media_playlist *me)
     if (me->first_media_segment != me->last_media_segment) {
         struct hls_media_segment *ms = me->last_media_segment;
         uint64_t duration_ms = 0;
-        uint64_t duration_offset_ms = hls_args.live_start_offset * 1000; 
+        uint64_t duration_offset_ms = hls_args.live_start_offset_sec * 1000; 
         while (ms) {
             duration_ms += ms->duration_ms;
             if (duration_ms >= duration_offset_ms) {
@@ -912,12 +931,13 @@ int download_live_hls(struct hls_media_playlist *me)
         }
         
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
+        int retries = 0;
         do {
             
             struct ByteBuffer seg;
             memset(&seg, 0x00, sizeof(seg));
             size_t size = 0;
-            long http_code = get_data_from_url_with_session(&session, &(ms->url), (char **)&(seg.data), &size, BINARY, false);
+            long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL);
             seg.len = (int)size;
             if (http_code != 200) {
                 int first_media_sequence = 0;
@@ -930,13 +950,14 @@ int download_live_hls(struct hls_media_playlist *me)
                 first_media_sequence = me->first_media_sequence;
                 pthread_mutex_unlock(&media_playlist_mtx);
                 
-                if(http_code != 403 && ms->sequence_number > first_media_sequence) {
+                if(http_code != 403 && http_code != 401 &&  http_code != 410 && retries <= hls_args.segment_download_retries && ms->sequence_number > first_media_sequence) {
                     clean_http_session(session);
                     sleep(1);
                     session = init_hls_session();
                     if (session) {
                         set_fresh_connect_http_session(session, 1);
                         MSG_WARNING("Live retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
+                        retries += 1;
                         continue;
                     }
                 }
@@ -1045,14 +1066,14 @@ int download_hls(struct hls_media_playlist *me)
         struct ByteBuffer seg;
         memset(&seg, 0x00, sizeof(seg));
         size_t size = 0;
-        long http_code = get_data_from_url_with_session(&session, &(ms->url), (char **)&(seg.data), &size, BINARY, false);
+        long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL);
         seg.len = (int)size;
         if (http_code != 200) {
             if (seg.data) {
                 free(seg.data);
                 seg.data = NULL;
             }
-            if (http_code != 403 && retries <= hls_args.segment_download_retries) {
+            if (http_code != 403 && http_code != 401 && http_code != 410 && retries <= hls_args.segment_download_retries) {
                 clean_http_session(session);
                 sleep(1);
                 session = init_hls_session();
@@ -1137,6 +1158,7 @@ void media_playlist_cleanup(struct hls_media_playlist *me)
 {
     struct hls_media_segment *ms = me->first_media_segment;
     free(me->source);
+    free(me->orig_url);
     free(me->url);
     free(me->enc_aes.key_url);
     
@@ -1152,6 +1174,7 @@ void media_playlist_cleanup(struct hls_media_playlist *me)
 void master_playlist_cleanup(struct hls_master_playlist *ma)
 {
     free(ma->source);
+    free(ma->orig_url);
     free(ma->url);
     free(ma->media_playlist);
 }
@@ -1182,7 +1205,7 @@ int fill_key_value(struct enc_aes128 *es)
         {
             char *key_value = NULL;
             size_t size = 0;
-            long http_code = get_hls_data_from_url(&es->key_url, &key_value, &size, BINKEY, false);
+            long http_code = get_hls_data_from_url(es->key_url, &key_value, &size, BINKEY, NULL);
             
             if (http_code != 200 || size == 0) {
                 MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);

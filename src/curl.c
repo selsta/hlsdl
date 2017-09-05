@@ -121,14 +121,14 @@ void set_fresh_connect_http_session(void *ptr_session, long val)
     curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);    
 }
 
-long get_data_from_url_with_session(void **ptr_session, char **url, char **out, size_t *size, int type, bool update_url)
+long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url)
 {
     assert(ptr_session && *ptr_session);
     struct http_session *session = *ptr_session;
     struct curl_slist *headers = session->headers;
     
     assert(session->handle);
-    assert(url && *url);
+    assert(url);
     assert(size);
     
     CURL *c = (CURL *)(session->handle);
@@ -136,7 +136,7 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
     long http_code = 0;
     char *e_url = NULL;
 
-    (*url)[strcspn(*url, "\r")] = '\0';
+    url[strcspn(url, "\r")] = '\0';
 
     struct MemoryStruct chunk;
 
@@ -146,13 +146,13 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
     chunk.reserved = 0;
     chunk.c = c; 
 
-    curl_easy_setopt(c, CURLOPT_URL, *url);
+    curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
     curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 2L);
     curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 3L); 
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
-    
+    /* curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, 1);*/
     /* enable all supported built-in compressions */
     curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "");
     
@@ -174,13 +174,10 @@ long get_data_from_url_with_session(void **ptr_session, char **url, char **out, 
     res = curl_easy_perform(c);
     
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
-    if (update_url && CURLE_OK == curl_easy_getinfo(c, CURLINFO_EFFECTIVE_URL, &e_url))
+    if (new_url && CURLE_OK == curl_easy_getinfo(c, CURLINFO_EFFECTIVE_URL, &e_url))
     {
-        if (0 != strcmp(*url, e_url))
-        {
-            free(*url);
-            *url = strdup(e_url);
-        }
+        free(*new_url);
+        *new_url = strdup(e_url);
     }
 
     if (res != CURLE_OK) {
@@ -232,12 +229,12 @@ void clean_http_session(void *ptr_session)
     free(session);
 }
 
-size_t get_data_from_url(char **url, char **str, uint8_t **bin, int type, bool update_url)
+size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **new_url)
 {
     CURL *c = (CURL *)init_http_session();
     size_t size;
     char *out = NULL;
-    get_data_from_url_with_session(&c, url, &out, &size, type, update_url);
+    get_data_from_url_with_session(&c, url, &out, &size, type, new_url);
     
     switch (type){
     case STRING:

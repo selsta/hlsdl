@@ -13,10 +13,11 @@
 
 #define KEYLEN 16
 
-#define HLSDL_MIN_REFRESH_DELAY    1
-#define HLSDL_MAX_REFRESH_DELAY    5
-#define HLSDL_MAX_RETRIES         30
-#define HLSDL_LIVE_START_OFFSET  120
+#define HLSDL_MIN_REFRESH_DELAY_SEC    0
+#define HLSDL_MAX_REFRESH_DELAY_SEC    5
+#define HLSDL_LIVE_START_OFFSET_SEC  120
+#define HLSDL_MAX_RETRIES             30
+#define HLSDL_OPEN_MAX_RETRIES         3
 
 struct enc_aes128 {
     bool iv_is_static;
@@ -35,6 +36,7 @@ struct hls_media_segment {
 };
 
 struct hls_media_playlist {
+    char *orig_url;
     char *url;
     char *source;
     unsigned int bitrate;
@@ -51,6 +53,7 @@ struct hls_media_playlist {
 };
 
 struct hls_master_playlist {
+    char *orig_url;
     char *url;
     char *source;
     int count;
@@ -79,6 +82,6 @@ void media_segment_cleanup(struct hls_media_segment *ms);
 void add_media_segment(struct hls_media_playlist *me);
 int fill_key_value(struct enc_aes128 *es);
 
-long get_hls_data_from_url(char **url, char **out, size_t *size, int type, bool update_url);
+long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url);
 
 #endif /* defined(__HLS_DownLoad__hls__) */

@@ -14,7 +14,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.09\n");
+    printf("hlsdl v0.11\n");
     printf("(c) 2017 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -26,7 +26,11 @@ static void print_help(const char *filename)
            "-f ... Force overwriting the output file.\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
-           "-t ... Print the links to the .ts files.\n", filename);
+           "-t ... Print the links to the .ts files.\n"
+           "-s ... Set live start offset in seconds\n"
+           "-e ... Set refresh delay in seconds\n"
+           "-r ... Set max retries at open\n"
+           "-w ... Set max download segment retries\n", filename);
     exit(0);
 }
 
@@ -35,7 +39,7 @@ int parse_argv(int argc, const char *argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:")) != -1) 
+    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:s:r:w:e:")) != -1) 
     {
         switch (c) 
         {
@@ -56,6 +60,18 @@ int parse_argv(int argc, const char *argv[])
             break;
         case 'f':
             hls_args.force_overwrite = 1;
+            break;
+        case 's':
+            hls_args.live_start_offset_sec = atoi(optarg);
+            break;
+        case 'e':
+            hls_args.refresh_delay_sec = atoi(optarg);
+            break;
+        case 'r':
+            hls_args.open_max_retries = atoi(optarg);
+            break;
+        case 'w':
+            hls_args.segment_download_retries = atoi(optarg);
             break;
         case 'o':
             hls_args.filename = optarg;
