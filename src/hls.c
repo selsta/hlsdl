@@ -111,10 +111,10 @@ int get_playlist_type(char *source)
     }
 
     if (strstr(source, "#EXT-X-STREAM-INF")) {
-        return 0;
+        return MASTER_PLAYLIST;
     }
 
-    return 1;
+    return MEDIA_PLAYLIST;
 }
 
 static int extend_url(char **url, const char *baseurl)
