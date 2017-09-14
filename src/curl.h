@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__curl__
-#define __HLS_DownLoad__curl__
+#ifndef __hlsdl__curl__
+#define __hlsdl__curl__
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,4 +30,4 @@ void set_fresh_connect_http_session(void *ptr_session, long val);
 }
 #endif
 
-#endif /* defined(__HLS_DownLoad__curl__) */
+#endif /* defined(__hlsdl__curl__) */

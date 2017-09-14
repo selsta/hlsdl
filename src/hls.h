@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__hls__
-#define __HLS_DownLoad__hls__
+#ifndef __hlsdl__hls__
+#define __hlsdl__hls__
 
 #ifdef __cplusplus
 extern "C" {

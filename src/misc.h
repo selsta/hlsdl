@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__misc__
-#define __HLS_DownLoad__misc__
+#ifndef __hlsdl__misc__
+#define __hlsdl__misc__
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,4 +60,4 @@ char *repl_str(const char *str, const char *from, const char *to);
 }
 #endif
 
-#endif /* defined(__HLS_DownLoad__misc__) */
+#endif /* defined(__hlsdl__misc__) */

@@ -1,5 +1,5 @@
-#ifndef __HLS_DownLoad__msg__
-#define __HLS_DownLoad__msg__
+#ifndef __hlsdl__msg__
+#define __hlsdl__msg__
 
 #ifdef __cplusplus
 extern "C" {
