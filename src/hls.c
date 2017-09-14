@@ -811,7 +811,6 @@ static int sample_aes_decrypt_audio_data(hls_media_segment_t *s, uint8_t *ptr, u
 static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out, ByteBuffer_t *in, uint8_t *pcr, uint16_t pid, audiotype_t audio_codec, uint8_t *counter)
 {
     uint16_t pes_header_size = 0;
-
     // we need to skip PES header it is not part of NAL unit
     if (in->pos <= PES_HEADER_SIZE || in->data[0] != 0x00 || in->data[1] != 0x00 || in->data[1] == 0x01) {
         MSG_ERROR("Wrong or missing PES header!\n");
