@@ -727,7 +727,6 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
     uint8_t *end = buf_in + size;
     uint8_t *nal_start;
     uint8_t *nal_end;
-
     end = remove_emulation_prev(buf_in, end, buf_in, end);
 
     nal_start = ff_avc_find_startcode(buf_in, end);
