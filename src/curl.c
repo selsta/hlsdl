@@ -13,6 +13,8 @@ struct http_session {
     void *headers;
     char *user_agent;
     char *proxy_uri;
+    long speed_limit;
+    long speed_time;
 };
 
 struct MemoryStruct {
@@ -21,6 +23,16 @@ struct MemoryStruct {
     size_t reserved;
     CURL *c;
 };
+
+void * set_timeout_session(void *ptr_session, const long speed_limit, const long speed_time)
+{
+    struct http_session *session = ptr_session;
+    assert(session);
+    session->speed_limit = speed_limit;
+    session->speed_time = speed_time;
+    
+    return session;
+}
 
 static size_t
 WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -149,8 +161,15 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 2L);
-    curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 3L); 
+    
+    if (session->speed_limit) {
+        curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, session->speed_limit);
+    }
+    
+    if (session->speed_time) {
+        curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, session->speed_time); 
+    }
+    
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     /* curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, 1);*/
     /* enable all supported built-in compressions */

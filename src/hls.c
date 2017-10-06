@@ -696,6 +696,7 @@ static void *hls_playlist_update_thread(void *arg)
     pthread_cond_t  *media_playlist_empty_cond   = (pthread_cond_t *)(updater_params->media_playlist_empty_cond);
     
     void *session = init_hls_session();
+    set_timeout_session(session, 2L, 3L);
     bool is_endlist = false;
     char *url = NULL;
     int refresh_delay_s = 0;
@@ -797,6 +798,7 @@ static void *hls_playlist_update_thread(void *arg)
             sleep(1);
             session = init_hls_session();
             if (session) {
+                set_timeout_session(session, 2L, 15L);
                 set_fresh_connect_http_session(session, 1);
             }
         }
@@ -901,6 +903,7 @@ int download_live_hls(struct hls_media_playlist *me)
     pthread_create(&thread, NULL, hls_playlist_update_thread, &updater_params);
     
     void *session = init_hls_session();
+    set_timeout_session(session, 2L, 3L);
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
     time_t repTime = 0;
@@ -955,6 +958,7 @@ int download_live_hls(struct hls_media_playlist *me)
                     sleep(1);
                     session = init_hls_session();
                     if (session) {
+                        set_timeout_session(session, 2L, 5L);
                         set_fresh_connect_http_session(session, 1);
                         MSG_WARNING("Live retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);
                         retries += 1;
@@ -1055,6 +1059,7 @@ int download_hls(struct hls_media_playlist *me)
     
     int ret = 0;
     void *session = init_hls_session();
+    set_timeout_session(session, 2L, 3L);
     assert(session);
     time_t repTime = 0;
     int retries = 0;
@@ -1077,6 +1082,7 @@ int download_hls(struct hls_media_playlist *me)
                 clean_http_session(session);
                 sleep(1);
                 session = init_hls_session();
+                set_timeout_session(session, 2L, 30L);
                 if (session) {
                     set_fresh_connect_http_session(session, 1);
                     MSG_WARNING("VOD retry segment %d download, due to previous error. http_code[%d].\n", ms->sequence_number, (int)http_code);

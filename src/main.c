@@ -64,6 +64,7 @@ int main(int argc, const char * argv[])
 
     if (playlist_type == MASTER_PLAYLIST) {
         struct hls_master_playlist master_playlist;
+        memset(&master_playlist, 0x00, sizeof(master_playlist));
         master_playlist.source = hlsfile_source;
         master_playlist.url = url;
         url = NULL;
@@ -89,10 +90,11 @@ int main(int argc, const char * argv[])
                 exit(1);
             }
         }
-        media_playlist = master_playlist.media_playlist[quality_choice];
-        master_playlist_cleanup(&master_playlist);
-        media_playlist.orig_url = strdup(media_playlist.url);
         
+        // make copy of structure 
+        media_playlist = master_playlist.media_playlist[quality_choice];
+        media_playlist.orig_url = strdup(media_playlist.url);
+        master_playlist_cleanup(&master_playlist);
     } else if (playlist_type == MEDIA_PLAYLIST) {
         media_playlist.source = hlsfile_source;
         media_playlist.bitrate = 0;
