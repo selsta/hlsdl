@@ -18,6 +18,7 @@ else
 endif
 S_OBJS=	$(S_SRC:.c=.o)
 
+PKGCONFIG= pkg-config libcurl libavformat libavutil libavcodec
 CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=-Wsign-compare -Iincludes
