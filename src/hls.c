@@ -114,6 +114,11 @@ int get_playlist_type(char *source)
         return MASTER_PLAYLIST;
     }
 
+    if (strstr(source, "KEYFORMAT=\"com.apple.streamingkeydelivery\"")) {
+        MSG_WARNING("HLS stream is DRM protected. Exiting\n");
+        return -1;
+    }
+
     return MEDIA_PLAYLIST;
 }
 
