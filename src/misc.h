@@ -31,6 +31,8 @@ struct hls_args {
     char *user_agent;
     char *proxy_uri;
     char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
+    char *key_uri_replace_old;
+    char *key_uri_replace_new;
 };
 
 static const uint8_t h264_nal_init[3] = {0x00, 0x00, 0x01};
@@ -54,6 +56,8 @@ int read_packet(void *opaque, uint8_t *buf, int buf_size);
 int64_t seek(void *opaque, int64_t offset, int whence);
 int bytes_remaining(uint8_t *pos, uint8_t *end);
 int str_to_bin(uint8_t *data, char *hexstring, int len);
-int parse_argv(int argc, const char *argv[]);
+int parse_argv(int argc, char * const argv[]);
+
+char *repl_str(const char *str, const char *from, const char *to);
 
 #endif /* defined(__HLS_DownLoad__misc__) */

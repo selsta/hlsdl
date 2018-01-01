@@ -13,7 +13,7 @@
 #include "msg.h"
 #include "misc.h"
 
-int main(int argc, const char * argv[])
+int main(int argc, char *argv[])
 {
     memset(&hls_args, 0x00, sizeof(hls_args));
     hls_args.loglevel = 1;

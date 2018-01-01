@@ -698,7 +698,7 @@ static void *hls_playlist_update_thread(void *arg)
     void *session = init_hls_session();
     set_timeout_session(session, 2L, 3L);
     bool is_endlist = false;
-    char *url = NULL;
+    //char *url = NULL;
     int refresh_delay_s = 0;
     
     // no lock is needed here because download_live_hls not change this fields
@@ -827,10 +827,9 @@ int download_live_hls(struct hls_media_playlist *me)
                 exit(1);
             }
         } else {
-            char userchoice;
+            char userchoice = '\0';
             MSG_PRINT("File already exists. Overwrite? (y/n) ");
-            scanf("\n%c", &userchoice);
-            if (userchoice == 'y') {
+            if (scanf("\n%c", &userchoice) && userchoice == 'y') {
                 if (remove(filename) != 0) {
                     MSG_ERROR("Error overwriting file");
                     exit(1);
@@ -1035,10 +1034,9 @@ int download_hls(struct hls_media_playlist *me)
                 exit(1);
             }
         } else {
-            char userchoice;
+            char userchoice = '\0';
             MSG_PRINT("File already exists. Overwrite? (y/n) ");
-            scanf("\n%c", &userchoice);
-            if (userchoice == 'y') {
+            if (scanf("\n%c", &userchoice) && userchoice == 'y') {
                 if (remove(filename) != 0) {
                     MSG_ERROR("Error overwriting file");
                     exit(1);
@@ -1209,9 +1207,23 @@ int fill_key_value(struct enc_aes128 *es)
         }
         else
         {
+            char *key_url = NULL;
             char *key_value = NULL;
             size_t size = 0;
-            long http_code = get_hls_data_from_url(es->key_url, &key_value, &size, BINKEY, NULL);
+            long http_code = 0;
+            
+            if (NULL != hls_args.key_uri_replace_old && \
+                NULL != hls_args.key_uri_replace_new && \
+                '\0' != hls_args.key_uri_replace_old[0]) {
+                key_url = repl_str(es->key_url, hls_args.key_uri_replace_old, hls_args.key_uri_replace_new);
+            } else {
+                key_url = es->key_url;
+            }
+
+            http_code = get_hls_data_from_url(key_url, &key_value, &size, BINKEY, NULL);
+            if (es->key_url != key_url) {
+                free(key_url);
+            }
             
             if (http_code != 200 || size == 0) {
                 MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
