@@ -133,7 +133,7 @@ void set_fresh_connect_http_session(void *ptr_session, long val)
     curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);    
 }
 
-long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url)
+long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url, const char *range)
 {
     assert(ptr_session && *ptr_session);
     struct http_session *session = *ptr_session;
@@ -159,6 +159,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     chunk.c = c; 
 
     curl_easy_setopt(c, CURLOPT_URL, url);
+    curl_easy_setopt(c, CURLOPT_RANGE, range);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
     
@@ -253,7 +254,7 @@ size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **
     CURL *c = (CURL *)init_http_session();
     size_t size;
     char *out = NULL;
-    get_data_from_url_with_session(&c, url, &out, &size, type, new_url);
+    get_data_from_url_with_session(&c, url, &out, &size, type, new_url, NULL);
     
     switch (type){
     case STRING:

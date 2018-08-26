@@ -16,7 +16,7 @@ void * set_user_agent_http_session(void *ptr_session, const char *user_agent);
 void * set_proxy_uri_http_session(void *ptr_session, const char *proxy_uri);
 void * set_timeout_session(void *ptr_session, const long speed_limit, const long speed_time);
 void add_custom_header_http_session(void *ptr_session, const char *header);
-long get_data_from_url_with_session(void **session, char *url, char **out, size_t *size, int type, char **new_url);
+long get_data_from_url_with_session(void **session, char *url, char **out, size_t *size, int type, char **new_url, const char *range);
 void clean_http_session(void *session);
 size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **new_url);
 void set_fresh_connect_http_session(void *ptr_session, long val);

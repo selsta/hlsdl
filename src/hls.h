@@ -28,6 +28,8 @@ struct enc_aes128 {
 
 struct hls_media_segment {
     char *url;
+    int64_t offset;
+    int64_t size;
     int sequence_number;
     uint64_t duration_ms;
     struct enc_aes128 enc_aes;

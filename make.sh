@@ -2,6 +2,8 @@
 
 set -e
 
+export CURL_TYPE="OPENSSL"
+
 MYTOPDIR=$PWD
 S_SRC="$MYTOPDIR/src/main.c $MYTOPDIR/src/aes.c $MYTOPDIR/src/curl.c $MYTOPDIR/src/hls.c $MYTOPDIR/src/misc.c $MYTOPDIR/src/msg.c"
 
@@ -35,5 +37,5 @@ else
 fi
 
 #-O0 -g 
-$CC -O2 -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/$BINARY_NAME
+$CC -O2 -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/curl_openssl/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/$BINARY_NAME
 $STRIP -s $OUTDIR/$BINARY_NAME

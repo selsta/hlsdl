@@ -90,7 +90,7 @@ static void * init_hls_session(void)
 long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url)
 {
     void *session = init_hls_session();
-    long http_code = get_data_from_url_with_session(&session, url, out, size, type, new_url);
+    long http_code = get_data_from_url_with_session(&session, url, out, size, type, new_url, NULL);
     clean_http_session(session);
     return http_code;
 }
@@ -126,7 +126,6 @@ static int extend_url(char **url, const char *baseurl)
         }
         return 0;
     }
-
     else if (**url == '/') {
         char *domain = malloc(max_length);
         strcpy(domain, baseurl);
@@ -134,7 +133,14 @@ static int extend_url(char **url, const char *baseurl)
         if( 2 == sscanf(baseurl, "%5[^:]://%[^/]", proto, domain))
         {
             char *buffer = malloc(max_length);
-            snprintf(buffer, max_length, "%s://%s%s", proto, domain, *url);
+            if ( (*url)[1] == '/') // url start with "//"
+            {
+                snprintf(buffer, max_length, "%s:%s", proto, *url);
+            }
+            else
+            {
+                snprintf(buffer, max_length, "%s://%s%s", proto, domain, *url);
+            }
             *url = realloc(*url, strlen(buffer) + 1);
             strcpy(*url, buffer);
             free(buffer);
@@ -161,7 +167,7 @@ static int extend_url(char **url, const char *baseurl)
     }
 }
 
-static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms, char *tag)
+static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms, char *tag, int64_t *seg_offset, int64_t *seg_size)
 {
     int enc_type;
 
@@ -182,6 +188,13 @@ static int parse_tag(struct hls_media_playlist *me, struct hls_media_segment *ms
             }
         } else if (!strncmp(tag, "#EXT-X-TARGETDURATION:", 22)){
             me->target_duration_ms = get_duration_ms(tag+22);
+            return 0;
+        } else if (!strncmp(tag, "#EXT-X-BYTERANGE:", 17)) {
+            *seg_size = strtoll(tag+17, NULL, 10);
+            tag = strchr(tag+17, '@');
+            if (tag) {
+                *seg_offset = strtoll(tag+1, NULL, 10);
+            }
             return 0;
         }
         return 1;
@@ -239,6 +252,8 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
     struct hls_media_segment *ms = NULL;
     struct hls_media_segment *curr_ms = NULL;
     char *src = me->source;
+    int64_t seg_offset = 0;
+    int64_t seg_size = -1;
     
     MSG_PRINT("> START media_playlist_get_links\n");
     
@@ -259,7 +274,7 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 continue;
             }
             if (*src == '#') {
-                parse_tag(me, ms, src);
+                parse_tag(me, ms, src, &seg_offset, &seg_size);
                 continue;
             }
             if (*src == '\0') {
@@ -290,6 +305,16 @@ static int media_playlist_get_links(struct hls_media_playlist *me)
                 extend_url(&(ms->url), me->url);
                 
                 ms->sequence_number = i + me->first_media_sequence;
+                
+                ms->size = seg_size;
+                if (seg_size >= 0) {
+                    ms->offset = seg_offset;
+                    seg_offset += seg_size;
+                    seg_size = -1;
+                } else {
+                    ms->offset = 0;
+                    seg_offset = 0;
+                }
                 
                 /* Add new segment to segment list */
                 if (me->first_media_segment == NULL)
@@ -733,7 +758,7 @@ static void *hls_playlist_update_thread(void *arg)
         
         size_t size = 0;
         MSG_PRINT("> START DOWNLOAD LIST url[%s]\n", me->url);
-        long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url));
+        long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url), NULL);
         MSG_PRINT("> END DOWNLOAD LIST\n");
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
@@ -907,6 +932,7 @@ int download_live_hls(struct hls_media_playlist *me)
     int64_t download_size = 0;
     time_t repTime = 0;
     bool download = true;
+    char range_buff[22];
     while(download) {
         
         pthread_mutex_lock(&media_playlist_mtx);
@@ -934,14 +960,18 @@ int download_live_hls(struct hls_media_playlist *me)
         
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         int retries = 0;
+        char *range = NULL;
+        if (ms->size > -1) {
+            snprintf(range_buff, sizeof(range_buff), "%lld-%lld", ms->offset, ms->offset + ms->size - 1);
+            range = range_buff;
+        }
         do {
-            
             struct ByteBuffer seg;
             memset(&seg, 0x00, sizeof(seg));
             size_t size = 0;
-            long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL);
+            long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, range);
             seg.len = (int)size;
-            if (http_code != 200) {
+            if (http_code != 200 && (range == NULL || http_code != 206)) {
                 int first_media_sequence = 0;
                 if (seg.data) {
                     free(seg.data);
@@ -1064,14 +1094,21 @@ int download_hls(struct hls_media_playlist *me)
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
     struct hls_media_segment *ms = me->first_media_segment;
+    char range_buff[22];
     while(ms && ret == 0) {
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
+        char *range = NULL;
+        if (ms->size > -1) {
+            snprintf(range_buff, sizeof(range_buff), "%lld-%lld", ms->offset, ms->offset + ms->size - 1);
+            range = range_buff;
+        }
+        
         struct ByteBuffer seg;
         memset(&seg, 0x00, sizeof(seg));
         size_t size = 0;
-        long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL);
+        long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, range);
         seg.len = (int)size;
-        if (http_code != 200) {
+        if (http_code != 200 && (range == NULL || http_code != 206)) {
             if (seg.data) {
                 free(seg.data);
                 seg.data = NULL;
