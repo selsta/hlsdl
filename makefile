@@ -4,7 +4,7 @@ PREFIX?=/usr/local
 HLSDL=hlsdl
 INSTALL_DIR=$(PREFIX)/bin
 
-S_SRC= src/main.c src/aes.c src/curl.c src/hls.c src/misc.c src/msg.c	
+S_SRC= src/main.c src/aes.c src/curl.c src/hls.c src/misc.c src/msg.c src/mpegts.c	
 S_OBJS=	$(S_SRC:.c=.o)
 
 CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
