@@ -130,7 +130,7 @@ void set_fresh_connect_http_session(void *ptr_session, long val)
 {
     struct http_session *session = ptr_session;
     CURL *c = (CURL *)(session->handle);
-    curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);    
+    curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);
 }
 
 long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url, const char *range)

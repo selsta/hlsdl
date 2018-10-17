@@ -19,14 +19,14 @@
 #define HLSDL_MAX_RETRIES             30
 #define HLSDL_OPEN_MAX_RETRIES         3
 
-struct enc_aes128 {
+typedef struct enc_aes128 {
     bool iv_is_static;
     uint8_t iv_value[KEYLEN];
     uint8_t key_value[KEYLEN];
     char *key_url;
-};
+} enc_aes128_t;
 
-struct hls_media_segment {
+typedef struct hls_media_segment {
     char *url;
     int64_t offset;
     int64_t size;
@@ -35,12 +35,14 @@ struct hls_media_segment {
     struct enc_aes128 enc_aes;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;
-};
+} hls_media_segment_t;
 
-struct hls_media_playlist {
+typedef struct hls_media_playlist {
     char *orig_url;
     char *url;
     char *source;
+    char *audio_grp;
+    char *resolution;
     unsigned int bitrate;
     uint64_t target_duration_ms;
     uint64_t total_duration_ms;
@@ -52,36 +54,45 @@ struct hls_media_playlist {
     struct hls_media_segment *first_media_segment;
     struct hls_media_segment *last_media_segment;
     struct enc_aes128 enc_aes;
-};
 
-struct hls_master_playlist {
+    struct hls_media_playlist *next;
+} hls_media_playlist_t;
+
+typedef struct hls_audio {
+    char *url;
+    char *grp_id;
+    char *lang;
+    char *name;
+    struct hls_audio *next;
+} hls_audio_t;
+
+typedef struct hls_master_playlist {
     char *orig_url;
     char *url;
     char *source;
-    int count;
-    struct hls_media_playlist *media_playlist;
-};
+    hls_media_playlist_t *media_playlist;
+    hls_audio_t *audio;
+} hls_master_playlist_t;
 
-struct hls_playlist_updater_params {
-    struct hls_media_playlist *media_playlist;
+typedef struct hls_playlist_updater_params {
+    hls_media_playlist_t *media_playlist;
     void *media_playlist_mtx;
     void *media_playlist_refresh_cond;
     void *media_playlist_empty_cond;
-};
-typedef struct hls_playlist_updater_params hls_playlist_updater_params;
+} hls_playlist_updater_params;
 
 
 int get_playlist_type(char *source);
 int handle_hls_master_playlist(struct hls_master_playlist *ma);
-int handle_hls_media_playlist(struct hls_media_playlist *me);
-int download_live_hls(struct hls_media_playlist *me);
-int download_hls(struct hls_media_playlist *me);
-int print_enc_keys(struct hls_media_playlist *me);
+int handle_hls_media_playlist(hls_media_playlist_t *me);
+int download_live_hls(hls_media_playlist_t *me);
+int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
+int print_enc_keys(hls_media_playlist_t *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
-void media_playlist_cleanup(struct hls_media_playlist *me);
+void media_playlist_cleanup(hls_media_playlist_t *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
 void media_segment_cleanup(struct hls_media_segment *ms);
-void add_media_segment(struct hls_media_playlist *me);
+void add_media_segment(hls_media_playlist_t *me);
 int fill_key_value(struct enc_aes128 *es);
 
 long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url);

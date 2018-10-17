@@ -14,8 +14,8 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.16\n");
-    printf("(c) 2017 samsamsam@o2.pl based on @selsta code\n");
+    printf("hlsdl v0.17\n");
+    printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
            "-v ... Verbose more information.\n"
@@ -32,7 +32,8 @@ static void print_help(const char *filename)
            "-s ... Set live start offset in seconds\n"
            "-e ... Set refresh delay in seconds\n"
            "-r ... Set max retries at open\n"
-           "-w ... Set max download segment retries\n", filename);
+           "-w ... Set max download segment retries\n"
+           "-a ... Set uri to audio media playlist\n", filename);
     exit(0);
 }
 
@@ -41,7 +42,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:s:r:w:e:p:k:n:")) != -1) 
+    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:s:r:w:e:p:k:n:a:")) != -1) 
     {
         switch (c) 
         {
@@ -95,6 +96,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'n':
             hls_args.key_uri_replace_new = optarg;
+            break;
+        case 'a':
+            hls_args.audio_url = optarg;
             break;
         default:
             MSG_ERROR("?? getopt returned character code 0%o ??\n", c);

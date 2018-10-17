@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define STRLEN_BTS(LEN) (((LEN) * 2) + 1)
+#define STRLEN_BTS(LEN) (((LEN) * 2) + 2)
 
 #define MAX_FILENAME_LEN 256
 #define MAX_URL_LEN 2048
@@ -28,6 +28,7 @@ struct hls_args {
     int open_max_retries;
     char *filename;
     char *url;
+    char *audio_url;
     char *user_agent;
     char *proxy_uri;
     char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
