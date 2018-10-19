@@ -19,7 +19,7 @@ Usage and Options
 
 ---------------------------
 ```
--b ... Automaticly choose the best quality.
+-b ... Automatically choose the best quality.
 
 -v ... Verbose more information.
 
@@ -56,5 +56,5 @@ Usage and Options
 Todo
 ----
 
-- removing ffmpeg dependency and use own simple mpegts demux implementation
+- remove ffmpeg dependency and use own simple mpegts demux implementation
 
