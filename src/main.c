@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
                 }
                 me = me->next;
             }
-            MSG_VERBOSE("Choosing best quality. (Bitrate: %d), (Resolution: %s)\n", selected->bitrate, selected->resolution);
+            MSG_VERBOSE("Choosing best quality. (Bitrate: %d), (Resolution: %s), (Codecs: %s)\n", selected->bitrate, selected->resolution, selected->codecs);
         } else {
             // print hls master playlist
             int i = 1;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 
             hls_media_playlist_t *me = master_playlist.media_playlist;
             while (me) {
-                MSG_PRINT("%d: Bandwidth: %d, Resolution: %s\n", i, me->bitrate, me->resolution);
+                MSG_PRINT("%d: Bandwidth: %d, Resolution: %s, Codecs: %s\n", i, me->bitrate, me->resolution, me->codecs);
                 i += 1;
                 me = me->next;
             }
@@ -157,12 +157,21 @@ int main(int argc, char *argv[])
                 }
             } else {
                 audio_choice = 1;
+                i = 0;
+                audio = master_playlist.audio;
+                while (audio) {
+                    if (0 == strcmp(audio->grp_id, selected->audio_grp) && audio->is_default) {
+                        i += 1;
+                        audio_choice = i;
+                        break;
+                    }
+                    audio = audio->next;
+                }
             }
             
             i = 0;
             audio = master_playlist.audio;
             while (audio) {
-                printf("%s\n", audio->grp_id);
                 if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
                     i += 1;
                     if (i == audio_choice) {
@@ -187,6 +196,7 @@ int main(int argc, char *argv[])
         selected->url = NULL;
         selected->audio_grp = NULL;
         selected->resolution = NULL;
+        selected->codecs = NULL;
         
         media_playlist.orig_url = strdup(media_playlist.url);
         master_playlist_cleanup(&master_playlist);

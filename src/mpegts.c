@@ -1,9 +1,215 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mpegts.h"
+
+#ifndef _MSC_VER
 #include "msg.h"
+#else
+#define MSG_ERROR printf
+#define MSG_WARNING printf
+#define MSG_DBG printf
+void *memmem(const void *haystack, size_t n, const void *needle, size_t m);
+#endif
+
+/**
+ * Possible frame sizes.
+ * from ATSC A/52 Table 5.18 Frame Size Code Table.
+ */
+const uint16_t ac3_frame_size_tab[38][3] = {
+    { 64,   69,   96   },
+    { 64,   70,   96   },
+    { 80,   87,   120  },
+    { 80,   88,   120  },
+    { 96,   104,  144  },
+    { 96,   105,  144  },
+    { 112,  121,  168  },
+    { 112,  122,  168  },
+    { 128,  139,  192  },
+    { 128,  140,  192  },
+    { 160,  174,  240  },
+    { 160,  175,  240  },
+    { 192,  208,  288  },
+    { 192,  209,  288  },
+    { 224,  243,  336  },
+    { 224,  244,  336  },
+    { 256,  278,  384  },
+    { 256,  279,  384  },
+    { 320,  348,  480  },
+    { 320,  349,  480  },
+    { 384,  417,  576  },
+    { 384,  418,  576  },
+    { 448,  487,  672  },
+    { 448,  488,  672  },
+    { 512,  557,  768  },
+    { 512,  558,  768  },
+    { 640,  696,  960  },
+    { 640,  697,  960  },
+    { 768,  835,  1152 },
+    { 768,  836,  1152 },
+    { 896,  975,  1344 },
+    { 896,  976,  1344 },
+    { 1024, 1114, 1536 },
+    { 1024, 1115, 1536 },
+    { 1152, 1253, 1728 },
+    { 1152, 1254, 1728 },
+    { 1280, 1393, 1920 },
+    { 1280, 1394, 1920 },
+};
+
+typedef enum raw_audiotype_e{
+	RAW_AUDIO_UNKNOWN,
+    RAW_AUDIO_ADTS,
+	RAW_AUDIO_AC3,
+	RAW_AUDIO_EC3
+} raw_audiotype_t;
+
+#define INVALID_PTS_VALUE   0x200000000ull
+#define MAX_PES_PACKET_SIZE        (65535)
+#define PES_HEADER_SIZE                  9
+#define PES_HEADER_WITH_PTS_SIZE        14
+
+typedef struct BitPacker_s
+{
+    uint8_t   *Ptr;                                    /* write pointer */
+    uint32_t   BitBuffer;                              /* bitreader shifter */
+    int32_t    Remaining;                              /* number of remaining in the shifter */
+} BitPacker_t;
+
+static void PutBits(BitPacker_t * ld, uint32_t code, uint32_t length)
+{
+    unsigned int bit_buf;
+    unsigned int bit_left;
+
+    bit_buf = ld->BitBuffer;
+    bit_left = ld->Remaining;
+
+    if (length < bit_left)
+    {
+        /* fits into current buffer */
+        bit_buf = (bit_buf << length) | code;
+        bit_left -= length;
+    }
+    else
+    {
+        /* doesn't fit */
+        bit_buf <<= bit_left;
+        bit_buf |= code >> (length - bit_left);
+        ld->Ptr[0] = (char)(bit_buf >> 24);
+        ld->Ptr[1] = (char)(bit_buf >> 16);
+        ld->Ptr[2] = (char)(bit_buf >> 8);
+        ld->Ptr[3] = (char)bit_buf;
+        ld->Ptr   += 4;
+        length    -= bit_left;
+        bit_buf    = code & ((1 << length) - 1);
+        bit_left   = 32 - length;
+        bit_buf = code;
+    }
+
+    /* writeback */
+    ld->BitBuffer = bit_buf;
+    ld->Remaining = bit_left;
+}
+
+static void FlushBits(BitPacker_t *ld)
+{
+    ld->BitBuffer <<= ld->Remaining;
+    while (ld->Remaining < 32)
+    {
+        *ld->Ptr++ = ld->BitBuffer >> 24;
+        ld->BitBuffer <<= 8;
+        ld->Remaining += 8;
+    }
+    ld->Remaining = 32;
+    ld->BitBuffer = 0;
+}
+
+static int32_t InsertPesHeader(uint8_t *data, int32_t size, uint8_t stream_id, uint64_t pts, uint32_t pic_start_code)
+{
+    BitPacker_t ld2 = {data, 0, 32};
+
+    if (size > (MAX_PES_PACKET_SIZE-13))
+    {
+        size = -1; // unbounded
+    }
+
+    PutBits(&ld2,0x0  ,8);
+    PutBits(&ld2,0x0  ,8);
+    PutBits(&ld2,0x1  ,8);  // Start Code
+    PutBits(&ld2,stream_id ,8);  // Stream_id = Audio Stream
+    //4
+    if (-1 == size)
+    {
+        PutBits(&ld2,0x0,16);
+    }
+    else
+    {
+        PutBits(&ld2,size + 3 + (pts != INVALID_PTS_VALUE ? 5:0) + (pic_start_code ? 5:0), 16); // PES_packet_length
+    }
+    //6 = 4+2
+    PutBits(&ld2,0x2  ,2);  // 10
+    PutBits(&ld2,0x0  ,2);  // PES_Scrambling_control
+    PutBits(&ld2,0x0  ,1);  // PES_Priority
+    PutBits(&ld2,0x0  ,1);  // data_alignment_indicator
+    PutBits(&ld2,0x0  ,1);  // Copyright
+    PutBits(&ld2,0x0  ,1);  // Original or Copy
+    //7 = 6+1
+
+    if (pts!=INVALID_PTS_VALUE)
+    {
+        PutBits(&ld2,0x2 ,2);
+    }
+    else
+    {
+        PutBits(&ld2,0x0 ,2);  // PTS_DTS flag
+    }
+
+    PutBits(&ld2,0x0 ,1);  // ESCR_flag
+    PutBits(&ld2,0x0 ,1);  // ES_rate_flag
+    PutBits(&ld2,0x0 ,1);  // DSM_trick_mode_flag
+    PutBits(&ld2,0x0 ,1);  // additional_copy_ingo_flag
+    PutBits(&ld2,0x0 ,1);  // PES_CRC_flag
+    PutBits(&ld2,0x0 ,1);  // PES_extension_flag
+    //8 = 7+1
+
+    if (pts!=INVALID_PTS_VALUE)
+    {
+        PutBits(&ld2,0x5,8);
+    }
+    else
+    {
+        PutBits(&ld2,0x0 ,8);  // PES_header_data_length
+    }
+    //9 = 8+1
+
+    if (pts!=INVALID_PTS_VALUE)
+    {
+        PutBits(&ld2,0x2,4);
+        PutBits(&ld2,(pts>>30) & 0x7,3);
+        PutBits(&ld2,0x1,1);
+        PutBits(&ld2,(pts>>15) & 0x7fff,15);
+        PutBits(&ld2,0x1,1);
+        PutBits(&ld2,pts & 0x7fff,15);
+        PutBits(&ld2,0x1,1);
+    }
+    //14 = 9+5
+
+    if (pic_start_code)
+    {
+        PutBits(&ld2,0x0 ,8);
+        PutBits(&ld2,0x0 ,8);
+        PutBits(&ld2,0x1 ,8);  // Start Code
+        PutBits(&ld2,pic_start_code & 0xff ,8);  // 00, for picture start
+        PutBits(&ld2,(pic_start_code >> 8 )&0xff,8);  // For any extra information (like in mpeg4p2, the pic_start_code)
+        //14 + 4 = 18
+    }
+
+    FlushBits(&ld2);
+
+    return (ld2.Ptr - data);
+}
 
 static const unsigned int crc32_table[] =
 {
@@ -73,7 +279,7 @@ static const unsigned int crc32_table[] =
   0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 };
 
-static uint32_t crc32 (const uint8_t *data, uint32_t len)
+static uint32_t crc32(const uint8_t *data, uint32_t len)
 {
     uint32_t i;
     uint32_t crc = 0xffffffff;
@@ -226,25 +432,11 @@ static bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt)
     return false;
 }
 
-static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t *pmt)
+static bool merge_pmt_with_audio_component(const pmt_data_t *pmt1, const uint8_t *componennt_data, uint32_t component_len2, pmt_data_t *pmt)
 {
-    if (pmt1->epid == pmt2->epid)
-    {
-        MSG_ERROR("Same elementary pids %04x == %04x!!!\n", (uint32_t)pmt1->epid, (uint32_t)pmt2->epid);
-        return false;
-    }
-
-    if (pmt1->program != pmt2->program)
-    {
-        MSG_WARNING("Diffrent program ids %04x != %04x!!!\n", (uint32_t)pmt1->program, (uint32_t)pmt2->program);
-        //return false;
-    }
-
     uint32_t len1 = pmt1->pmt_idx + pmt1->pmt_sectionlen;
-    uint32_t len2 = pmt2->pmt_idx + pmt2->pmt_sectionlen;
-
     uint32_t component_len1 = len1 - pmt1->componennt_idx - 4; 
-    uint32_t component_len2 = len2 - pmt2->componennt_idx - 4; 
+
     if (len1 + component_len2 > TS_PACKET_LENGTH)
     {
         MSG_ERROR("Merged PMT to long for one TS packet!");
@@ -252,7 +444,7 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
     }
 
     memcpy(pmt, pmt1, sizeof(*pmt1));
-    memcpy(pmt->data + pmt->componennt_idx + component_len1, pmt2->data + pmt2->componennt_idx , component_len2);
+    memcpy(pmt->data + pmt->componennt_idx + component_len1, componennt_data, component_len2);
 
     // update section len
     pmt->pmt_sectionlen = pmt1->pmt_sectionlen + component_len2;
@@ -275,7 +467,356 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
     return true;
 }
 
-size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2)
+static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t *pmt)
+{
+    if (pmt1->epid == pmt2->epid)
+    {
+        MSG_ERROR("Same elementary pids %04x == %04x!!!\n", (uint32_t)pmt1->epid, (uint32_t)pmt2->epid);
+        return false;
+    }
+
+    if (pmt1->program != pmt2->program)
+    {
+        MSG_WARNING("Diffrent program ids %04x != %04x!!!\n", (uint32_t)pmt1->program, (uint32_t)pmt2->program);
+        //return false;
+    }
+
+    uint32_t len2 = pmt2->pmt_idx + pmt2->pmt_sectionlen;
+    uint32_t component_len2 = len2 - pmt2->componennt_idx - 4; 
+
+    return merge_pmt_with_audio_component(pmt1, pmt2->data + pmt2->componennt_idx, component_len2, pmt);
+}
+
+static const uint8_t* get_dts_from_id3(const uint8_t *buf, uint32_t size, int64_t *dts)
+{
+    if (size >= 73)
+    {
+        uint32_t len = 0;
+
+        len = ((uint32_t)(buf[6] & 0x7f) << 21) |
+              ((uint32_t)(buf[7] & 0x7f) << 14) |
+              ((uint32_t)(buf[8] & 0x7f) << 7) |
+              ((uint32_t) buf[9] & 0x7f);
+        len += 10; // header
+
+        if (len <= size) {
+            uint8_t *ptr = (uint8_t *)memmem(buf, size, "com.apple.streaming.transportStreamTimestamp", 44);
+            if (ptr) {
+                ptr += 45;
+                if (buf + len >= ptr + 8)
+                {
+                    int64_t ts = (int64_t)ptr[0] << 56 | (int64_t)ptr[1] << 48 | (int64_t)ptr[2] << 40 | (int64_t)ptr[3] << 32 |
+                                 (int64_t)ptr[4] << 24 | (int64_t)ptr[5] << 16 | (int64_t)ptr[6] << 8 | (int64_t)ptr[7];
+                    MSG_DBG("HLS ID3 audio timestamp %lld\n", ts);
+                    if ((ts & ~((1ULL << 33) - 1)) == 0)
+                    {
+                        *dts = ts;
+                        return (buf + len);
+                    } 
+                    else
+                    {
+                        MSG_ERROR("Invalid HLS ID3 audio timestamp %lld\n", ts);
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
+}
+
+static bool adts_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+{
+    for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
+    {
+        /* check for sync bits 0xfff */
+        if ((*data_ptr)[0] != 0xff || ((*data_ptr)[1] & 0xf0) != 0xf0) continue;
+
+        *frame_length = ((uint32_t)((*data_ptr)[3] & 0x03) << 11) | ((uint32_t)(*data_ptr)[4] << 3) | ((uint32_t)((*data_ptr)[5] & 0xe0) >> 5);
+
+        /* sanity check on the frame length */
+        if (*frame_length < 1 || *frame_length > 8 * 768 + 7 + 2) continue;
+        return (*data_ptr) + (*frame_length) <= end_ptr;
+    }
+    return false;
+}
+
+static bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+{
+
+    for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
+    {
+        // check for sync bits 0x0B77
+        if ((*data_ptr)[0] != 0x0B || (*data_ptr)[1] != 0x77) continue;
+
+        // AC3 bitstream_id must be <= 10
+        if ((((*data_ptr)[5] >> 3) & 0x1F) > 10) continue;
+
+        uint8_t sr_code = ((*data_ptr)[4] >> 6) & 0x3;
+        if (sr_code == 0x3) continue; // 11 reserved
+
+        uint8_t frame_size_code = (*data_ptr)[4] & 0x3F;
+        if (frame_size_code > 37) continue; // 100110 to 111111 reserved
+
+        *frame_length = ac3_frame_size_tab[frame_size_code][sr_code] * 2;
+
+        return (*data_ptr) + (*frame_length) <= end_ptr;
+    }
+    return false;
+}
+
+static bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+{
+
+    for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
+    {
+        // check for sync bits 0x0B77
+        if ((*data_ptr)[0] != 0x0B || (*data_ptr)[1] != 0x77) continue;
+
+        //Enhanced  AC3 bitstream_id must be > 10 and < 16
+        if ((((*data_ptr)[5] >> 3) & 0x1F) < 11 || (((*data_ptr)[5] >> 3) & 0x1F) > 16) continue;
+
+        *frame_length = (((((uint16_t)(*data_ptr)[2] & 0x7) << 8) | (uint16_t)(*data_ptr)[3]) + 1) << 1;
+
+        return (*data_ptr) + (*frame_length) <= end_ptr;
+    }
+    return false;
+}
+
+static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2, int64_t dts, raw_audiotype_t audiotype)
+{
+    uint8_t ts_header[4] = {TS_SYNC_BYTE, 0x00, 0x00, 0x10};
+    uint8_t cont_count = 0;
+    size_t ret = 0;
+    uint16_t epid = 0;
+    uint8_t stream_type = 0;
+    uint8_t stream_id = 0;
+    bool (* raw_audio_get_next_frame)(const uint8_t **, const uint8_t *, uint32_t *);
+
+    switch (audiotype)
+    {
+    case RAW_AUDIO_ADTS:
+        stream_type = 0xF; // stream_type: 0xF (15) => ISO/IEC 13818-7 Audio with ADTS transport syntax
+        stream_id = 0xC0;  // stream_id: 0xC0 (192) => ISO/IEC 13818-3 or ISO/IEC 11172-3 or ISO/IEC 13818-7 or ISO/IEC 14496-3 audio stream number 0
+        raw_audio_get_next_frame = adts_get_next_frame;
+        break;
+    case RAW_AUDIO_AC3:
+        stream_type = 0x81; // stream_type: 0x81 (129) => User Private / AC-3 (ATSC)
+        stream_id = 0xBD;   // stream_id: 0xBD (189) => private_stream_1
+        raw_audio_get_next_frame = ac3_get_next_frame;
+        break;
+    case RAW_AUDIO_EC3:
+        stream_type = 0x87; // stream_type: 0x87 (135) => User Private / E-AC-3 (ATSC)
+        stream_id = 0xBD;   // stream_id: 0xBD (189) => private_stream_1
+        raw_audio_get_next_frame = ec3_get_next_frame;
+        break;
+    case RAW_AUDIO_UNKNOWN:
+    default:
+        MSG_ERROR("Wrong audiotype! Should never happen here > EXIT!\n");
+        exit(1);
+    }
+
+    if ( !context->valid && find_pmt(pdata1, size1, &context->pmt1))
+    {
+        uint8_t component_audio[5] = {stream_type, 0x00, 0x00, 0x00, 0x00}; 
+        epid = context->pmt1.epid + 2;
+        component_audio[1] = (epid >> 8) & 0x1F;
+        component_audio[2] = epid & 0xFF;
+        if (merge_pmt_with_audio_component(&context->pmt1, component_audio, 5, &context->pmt))
+        {
+            context->valid = true;
+        }
+    }
+
+    if ( !context->valid )
+    {
+        MSG_ERROR("Invalid context!\n");
+        return 0;
+    }
+
+    epid = context->pmt1.epid + 2;
+    ts_header[1] = (epid >> 8) & 0x1F;
+    ts_header[2] = epid & 0xFF;
+
+    uint32_t count1 = size1 / TS_PACKET_LENGTH;
+    uint32_t count2 = 0;
+
+    // aac_adts_count_frames
+    const uint8_t *data_ptr = pdata2;
+    const uint8_t *end_ptr = pdata2 + size2;
+    uint32_t frame_length = 0;
+    while (raw_audio_get_next_frame(&data_ptr, end_ptr, &frame_length))
+    {
+        data_ptr += frame_length;
+        ++count2;
+    }
+
+    if (count1 && count2)
+    {
+        uint32_t max1 = 0;
+        uint32_t max2 = 0;
+        if (count1 > count2)
+        {
+            max1 = count1 / count2;
+            max2 = 1;
+        } 
+        else
+        {
+            max1 = 1;
+            max2 = count2 / count1;
+        }
+
+        data_ptr = pdata2;
+        end_ptr = pdata2 + size2;
+        uint32_t i = 0;
+        uint32_t j = 0;
+        while (i < count1 || j < count2)
+        {
+            for(uint32_t k=0; k<max1 && i < count1; ++k, ++i, pdata1 += TS_PACKET_LENGTH)
+            {
+                if (TS_SYNC_BYTE == pdata1[0])
+                {
+                    uint16_t pid = ((pdata1[1] & 0x1f) << 8) | pdata1[2]; // PID - 13b
+                    if (pid != context->pmt1.pid) {
+                        if (fwrite(pdata1, TS_PACKET_LENGTH, 1, context->out)) ret += TS_PACKET_LENGTH;
+                        if (TID_PAT == pid)
+                        {
+                            if (fwrite(context->pmt.data, TS_PACKET_LENGTH, 1, context->out)) ret += TS_PACKET_LENGTH;
+                        }
+                    }
+                }
+            }
+            for(uint32_t k=0; k<max2 && j < count2; ++k, ++j)
+            {
+                if (raw_audio_get_next_frame(&data_ptr, end_ptr, &frame_length))
+                {
+                   // we got ADTS frame here
+                   // add PES header, split to TS packets and add headers with addation field
+                   uint8_t pes_header[PES_HEADER_WITH_PTS_SIZE];
+                   int32_t pes_header_length = InsertPesHeader(pes_header, frame_length, stream_id, dts, 0);
+                   if (pes_header_length > 0)
+                   {
+                       uint32_t left_payload_size = frame_length;
+                       uint32_t towrite = 0;
+
+                       ts_header[1] |= 0x40; // set payload_unit_start_indicator
+                       ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
+                       cont_count = (cont_count + 1) % 16;
+
+                       // write first packet with PES header
+                       if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
+                       if (fwrite(pes_header, pes_header_length, 1, context->out)) ret += pes_header_length;
+                       towrite = TS_PACKET_LENGTH - 4 - pes_header_length;
+                       towrite = towrite >  left_payload_size ? left_payload_size : towrite;
+
+                       if (fwrite(data_ptr, towrite, 1, context->out)) ret += towrite;
+                       left_payload_size -= towrite;
+                       data_ptr += towrite;
+
+                       if (left_payload_size > 0)
+                       {
+                           uint32_t packets_num = left_payload_size / (TS_PACKET_LENGTH - 4);
+                           uint32_t p;
+                           ts_header[1] &= 0xBF; // unset payload_unit_start_indicator
+                           for (p=0; p < packets_num; ++p)
+                           {
+                               ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
+                               cont_count = (cont_count + 1) % 16;
+                               if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
+                               if (fwrite(data_ptr, TS_PACKET_LENGTH - 4, 1, context->out)) ret += TS_PACKET_LENGTH - 4;
+                               data_ptr += (TS_PACKET_LENGTH - 4);
+                           }
+                           left_payload_size -= (TS_PACKET_LENGTH - 4) * packets_num;
+                            
+                           if (left_payload_size > 0)
+                           {
+                               uint8_t s;
+                               uint8_t aflen = TS_PACKET_LENGTH - 4 - left_payload_size - 1;
+                               uint8_t pattern = 0xff;
+                               ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add aligment
+                               ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
+                               cont_count = (cont_count + 1) % 16;
+                               if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
+                               ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
+                               if (fwrite(&aflen, 1, 1, context->out)) ret += 1;
+                               if (aflen > 0)
+                               {
+                                    pattern = 0x00;
+                                    if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                    pattern = 0xff;
+                               }
+
+                               for(s=1; s < aflen; ++s)
+                               {
+                                    if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                               }
+                               if (fwrite(data_ptr, left_payload_size, 1, context->out)) ret += left_payload_size;
+                               
+                               data_ptr += left_payload_size;
+                           }
+                       }
+                   }
+                   else
+                   {
+                       MSG_WARNING("Wrong pes header length: %d!\n", pes_header_length);
+                       data_ptr += frame_length;
+                   }
+            
+                   dts = INVALID_PTS_VALUE;
+                   break;
+                }
+            }
+        }
+    }
+
+    return ret;
+}
+
+static size_t merge_with_raw_audio(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2)
+{
+    int64_t dts;
+    const uint8_t *ptr = get_dts_from_id3(pdata2, size2, &dts);
+    if (ptr) {
+        raw_audiotype_t audiotype = RAW_AUDIO_UNKNOWN;
+        size2 -= ptr - pdata2;
+        
+        if (size2 > 7 && ptr[0] == 0xFF && (ptr[1] & 0xf0)  == 0xF0) // ADTS syncword 0xFFF
+        {
+            audiotype = RAW_AUDIO_ADTS;
+        } 
+        else if (size2 > 7 && ptr[0] == 0x0B && ptr[1] == 0x77) // AC3, E-AC syncword 0x0B77
+        { 
+            uint8_t bitstream_id  = (ptr[5] >> 3) & 0x1F;
+            if (bitstream_id > 16)
+            {
+                MSG_ERROR("Unknown AC3/E-AC header - BSID parse error!\n");
+                return 0;
+            }
+            else if(bitstream_id <= 10)
+            {
+                /* Normal AC-3 */
+                audiotype = RAW_AUDIO_AC3;
+            }
+            else 
+            {
+                /* Enhanced AC-3 */
+                audiotype = RAW_AUDIO_EC3;
+            }
+        }
+        else 
+        {
+            MSG_ERROR("RAW audio stream: codec not supported!\n");
+            exit(1);
+        }
+        return do_merge_with_raw_audio(context, pdata1, size1, ptr, size2, dts, audiotype); 
+    }
+    else
+    {
+        MSG_ERROR("ID3 parsing failed!\n");
+    }
+    return 0;
+}
+
+static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2)
 {
     size_t ret = 0;
     if ( !context->valid)
@@ -355,4 +896,16 @@ size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t s
         }
     }
     return ret;
+}
+
+size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2)
+{
+    if (size2 > 3 && 0 == memcmp(pdata2, "ID3", 3))
+    {
+        return merge_with_raw_audio(context, pdata1, size1, pdata2, size2);
+    }
+    else
+    {
+        return merge_ts_packets(context, pdata1, size1, pdata2, size2);
+    }
 }

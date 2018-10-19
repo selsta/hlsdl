@@ -6,7 +6,7 @@ This program converts .m3u8 playlists to a .ts video. It supports decryption of 
 Requirements
 ------------
 
-This program requirers FFmpeg installed in order to decrypt SAMPLE-AES content.
+This program requires FFmpeg installed in order to decrypt SAMPLE-AES content.
 
 Build
 -----
@@ -19,26 +19,42 @@ Usage and Options
 
 ---------------------------
 ```
---best    or -b  ... Automaticly choose the best quality.
+-b ... Automaticly choose the best quality.
 
---verbose or -v  ... Verbose more information.
+-v ... Verbose more information.
 
---output  or -o  ... Choose name of output file.
+-o ... Choose name of output file.
 
---help    or -h  ... Print help.
+-u ... Set custom HTTP User-Agent header.
 
---force   or -f  ... Force overwriting the output file.
+-h ... Set custom HTTP header.
 
---quiet   or -q  ... Print less to the console.
+-p ... Set proxy uri.
 
---dump-dec-cmd   ... Print the Key and IV of each media segment.
+-k ... Allow to replace part of AES key uri - old.
 
---dump-ts-urls   ... Print the links to the .ts files.
+-n ... Allow to replace part of AES key uri - new.
+
+-f ... Force overwriting the output file.
+
+-q ... Print less to the console.
+
+-d ... Print the openssl decryption command.
+
+-t ... Print the links to the .ts files.
+
+-s ... Set live start offset in seconds.
+
+-e ... Set refresh delay in seconds.
+
+-r ... Set max retries at open.
+
+-w ... Set max download segment retries.
+
+-a ... Set additional url to the audio media playlist.
 ```
 Todo
 ----
 
-- Multithreading
-- Remuxing to other formats
-- Local .m3u8 files
+- removing ffmpeg dependency and use own simple mpegts demux implementation
 

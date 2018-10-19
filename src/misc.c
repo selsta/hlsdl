@@ -14,26 +14,26 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.17\n");
+    printf("hlsdl v0.18\n");
     printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
            "-v ... Verbose more information.\n"
            "-o ... Choose name of output file.\n"
-           "-u ... Set custom HTTP User-Agent header\n"
+           "-u ... Set custom HTTP User-Agent header.\n"
            "-h ... Set custom HTTP header.\n"
            "-p ... Set proxy uri.\n"
-           "-k ... Allow to replace part of AES key uri - old"
-           "-n ... Allow to replace part of AES key uri - new"
+           "-k ... Allow to replace part of AES key uri - old."
+           "-n ... Allow to replace part of AES key uri - new."
            "-f ... Force overwriting the output file.\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
            "-t ... Print the links to the .ts files.\n"
-           "-s ... Set live start offset in seconds\n"
-           "-e ... Set refresh delay in seconds\n"
-           "-r ... Set max retries at open\n"
-           "-w ... Set max download segment retries\n"
-           "-a ... Set uri to audio media playlist\n", filename);
+           "-s ... Set live start offset in seconds.\n"
+           "-e ... Set refresh delay in seconds.\n"
+           "-r ... Set max retries at open.\n"
+           "-w ... Set max download segment retries.\n"
+           "-a ... Set additional url to the audio media playlist.\n", filename);
     exit(0);
 }
 

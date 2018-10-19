@@ -379,16 +379,52 @@ int handle_hls_media_playlist(hls_media_playlist_t *me)
     return 0;
 }
 
-static char* remove_quotes(char *token)
+static bool get_next_attrib(char **source, char **tag, char **val)
 {
-    if (*token == '"' || *token == '\'') {
-        token += 1;
-        size_t len = strlen(token);
-        if (len > 0 && (token[len-1] == '"' || token[len-1] == '\'')) {
-            token[len-1] = '\0';
-        }
+    bool ret = false;
+    char *ptr = NULL;
+    char *token = NULL;
+    char *value = NULL;
+    char end_val_marker = '\0';
+    char *src = *source;
+    while (*src != '\0' && strchr(", \t\n\r", *src)) {
+        ++src;
+        continue;
     }
-    return token;
+
+    ptr = src;
+    while (*ptr != '=' && *ptr != '\0') ++ptr;
+    if (*ptr != '\0') {
+        token = src;
+        *ptr = '\0';
+
+        ptr += 1;
+        if (*ptr == '"') {
+            ++ptr;
+            end_val_marker = '"';
+        } else {
+            end_val_marker = ',';
+        }
+
+        value = ptr;
+        while (*ptr != end_val_marker && *ptr != '\0') ++ptr;
+        src = ptr;
+        if (*ptr) {
+            ++src;
+            *ptr = '\0';
+        }
+
+        if (*value) {
+            *val = value;
+            *tag = token;
+            ret = true;
+        }
+        *source = src;
+    } else {
+        *source = ptr;
+    }
+    
+    return ret;
 }
 
 int handle_hls_master_playlist(struct hls_master_playlist *ma)
@@ -396,7 +432,11 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
     bool url_expected = false;
     unsigned int bitrate = 0;
     char *res = NULL;
+    char *codecs = NULL;
     char *audio_grp = NULL;
+
+    char *token = NULL;
+    char *value = NULL;
 
     char *src = ma->source;
     while(*src != '\0'){
@@ -409,22 +449,21 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
             url_expected = false;
             bitrate = 0;
             res = NULL;
+            codecs = NULL;
             audio_grp = NULL;
 
             if (!strncmp(src, "#EXT-X-STREAM-INF:", 18)) {
                 src += 18;
-                char *saveptr = NULL;
-                char *token = strtok_r(src, ",", &saveptr);
-                while (token) {
-                    if (!strncmp(token, "BANDWIDTH=", 10)) {
-                        sscanf(token+10, "%u", &bitrate);
-                    } else if (!strncmp(token, "AUDIO=", 6)) {
-                        audio_grp = remove_quotes(token + 6);
-                    }else if (!strncmp(token, "RESOLUTION=", 11)) {
-                        res = remove_quotes(token + 11);
+                while (get_next_attrib(&src, &token, &value)) {
+                    if (!strncmp(token, "BANDWIDTH", 9)) {
+                        sscanf(value, "%u", &bitrate);
+                    } else if (!strncmp(token, "AUDIO", 5)) {
+                        audio_grp = value;
+                    } else if (!strncmp(token, "RESOLUTION", 10)) {
+                        res = value;
+                    } else if (!strncmp(token, "CODECS", 6)) {
+                        codecs = value;
                     }
-
-                    token = strtok_r(NULL, ",", &saveptr);
                 }
                 url_expected = true;
             } else if (!strncmp(src, "#EXT-X-MEDIA:TYPE=AUDIO,", 24)) {
@@ -433,20 +472,22 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
                 char *name = NULL;
                 char *lang = NULL;
                 char *url = NULL;
+                bool is_default = false;
 
-                char *saveptr = NULL;
-                char *token = strtok_r(src, ",", &saveptr);
-                while (token) {
-                    if (!strncmp(token, "GROUP-ID=", 9)) {
-                        grp_id = remove_quotes(token + 9);
-                    } else if (!strncmp(token, "NAME=", 5)) {
-                        name = remove_quotes(token + 5);
-                    } else if (!strncmp(token, "LANGUAGE=", 9)) {
-                        lang = remove_quotes(token + 9);
-                    } else if (!strncmp(token, "URI=", 4)) {
-                        url = remove_quotes(token + 4);
+                while (get_next_attrib(&src, &token, &value)) {
+                    if (!strncmp(token, "GROUP-ID", 8)) {
+                        grp_id = value;
+                    } else if (!strncmp(token, "NAME", 4)) {
+                        name = value;
+                    } else if (!strncmp(token, "LANGUAGE", 8)) {
+                        lang = value;
+                    } else if (!strncmp(token, "URI", 3)) {
+                        url = value;
+                    } else if (!strncmp(token, "DEFAULT", 7)) {
+                        if (!strncmp(value, "YES", 3)) {
+                            is_default = true;
+                        }
                     }
-                    token = strtok_r(NULL, ",", &saveptr);
                 }
 
                 if (grp_id && name && url) {
@@ -462,6 +503,7 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
                     audio->grp_id = strdup(grp_id);
                     audio->name = strdup(name);
                     audio->lang = lang ? strdup(lang) : NULL;
+                    audio->is_default = is_default;
                     
                     if (ma->audio) {
                         audio->next = ma->audio;
@@ -483,6 +525,7 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
             me->bitrate = bitrate;
             me->audio_grp = audio_grp ? strdup(audio_grp) : NULL;
             me->resolution = res ? strdup(res) : strdup("unknown");
+            me->codecs = codecs ? strdup(codecs) : strdup("unknown");
             
             if (ma->media_playlist) {
                 me->next = ma->media_playlist;
@@ -1275,6 +1318,7 @@ void media_playlist_cleanup(hls_media_playlist_t *me)
     free(me->url);
     free(me->audio_grp);
     free(me->resolution);
+    free(me->codecs);
     free(me->enc_aes.key_url);
 
     while(ms){

@@ -43,6 +43,7 @@ typedef struct hls_media_playlist {
     char *source;
     char *audio_grp;
     char *resolution;
+    char *codecs;
     unsigned int bitrate;
     uint64_t target_duration_ms;
     uint64_t total_duration_ms;
@@ -63,6 +64,7 @@ typedef struct hls_audio {
     char *grp_id;
     char *lang;
     char *name;
+    bool is_default;
     struct hls_audio *next;
 } hls_audio_t;
 
