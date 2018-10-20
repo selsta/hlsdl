@@ -208,9 +208,8 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
     char sep = '\0';
-    
-    if ((sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0 ||
-         sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0%c%s", link_to_key, &sep, iv_str) > 0))
+    if ((sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0%c%32[0-9a-f]", link_to_key, &sep, iv_str) > 0 ||
+         sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0%c%32[0-9a-f]", link_to_key, &sep, iv_str) > 0))
     {
         if (sep == 'x' || sep == 'X')
         {
@@ -1259,13 +1258,13 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
 
         free(seg.data);
 
+        downloaded_duration_ms += ms->duration_ms;
+
         time_t curRepTime = time(NULL);
         if ((curRepTime - repTime) >= 1) {
             MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%lld}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
             repTime = curRepTime;
         }
-
-        downloaded_duration_ms += ms->duration_ms;
 
         ms = ms->next;
     }

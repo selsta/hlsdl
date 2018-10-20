@@ -36,6 +36,8 @@ else
     STRIP="strip"
 fi
 
-#-O0 -g 
+#
 $CC -O2 -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/curl_openssl/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/$BINARY_NAME
+#$CC -O0 -g -fdata-sections -ffunction-sections -Wl,--gc-sections -D_GNU_SOURCE=1 -std=gnu99 -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare $S_SRC $MYSYSROOT_DIR/curl_openssl/lib/libcurl.a -lrt -lpthread -lz -lssl -lcrypto -o $OUTDIR/$BINARY_NAME
+
 $STRIP -s $OUTDIR/$BINARY_NAME
