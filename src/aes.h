@@ -1,40 +1,17 @@
-#ifndef _AES_H_
-#define _AES_H_
+#ifndef _HLSDL_AES_CRYPTO_H_
+#define _HLSDL_AES_CRYPTO_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 
+void * AES128_CBC_CTX_new(void);
 
-// #define the macros below to 1/0 to enable/disable the mode of operation.
-//
-// CBC enables AES128 encryption in CBC-mode of operation and handles 0-padding.
-// ECB enables the basic ECB 16-byte block algorithm. Both can be enabled simultaneously.
+int AES128_CBC_DecryptInit(void *ctx, uint8_t *key, uint8_t *iv, bool with_padding);
 
-// The #ifndef-guard allows it to be configured before #include'ing or at compile time.
-#ifndef CBC
-  #define CBC 1
-#endif
+int AES128_CBC_DecryptUpdate(void *ctx, uint8_t *plaintext, uint8_t *ciphertext, int in_size);
 
-#ifndef ECB
-  #define ECB 1
-#endif
+int AES128_CBC_DecryptPadded(void *ctx, uint8_t *plaintext, uint8_t *ciphertext, int in_size, int *out_size);
 
+void AES128_CBC_free(void *ctx);
 
-
-#if defined(ECB) && ECB
-
-void AES128_ECB_encrypt(uint8_t* input, const uint8_t* key, uint8_t *output);
-void AES128_ECB_decrypt(uint8_t* input, const uint8_t* key, uint8_t *output);
-
-#endif // #if defined(ECB) && ECB
-
-
-#if defined(CBC) && CBC
-
-void AES128_CBC_encrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, const uint8_t* key, const uint8_t* iv);
-void AES128_CBC_decrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length, const uint8_t* key, const uint8_t* iv);
-
-#endif // #if defined(CBC) && CBC
-
-
-
-#endif //_AES_H_
+#endif //_HLSDL_AES_CRYPTO_H_

@@ -1,8 +1,12 @@
 #ifndef __HLS_DownLoad__mpegts__
 #define __HLS_DownLoad__mpegts__
 
+#ifndef _MSC_VER
 #include <stdbool.h>
 #include <stdint.h>
+#else
+#include "stdint.h"
+#endif
 
 #define TID_PAT                       0x00
 #define TID_CAT                       0x01
@@ -36,6 +40,32 @@ typedef enum pidtype_e{
 
 #define TS_PACKET_LENGTH              188
 #define TS_SYNC_BYTE                  0x47 
+#define MAX_COMPONENTS_NUM             10
+
+#define MAX_PES_PACKET_SIZE        (65535)
+#define PES_HEADER_SIZE                  9
+#define PES_HEADER_WITH_PTS_SIZE        14
+
+typedef enum audiotype_e{
+    AUDIO_UNKNOWN,
+    AUDIO_ADTS,
+    AUDIO_AC3,
+    AUDIO_EC3
+} audiotype_t;
+
+typedef struct ts_packet_s {
+    uint16_t pid;
+    uint8_t afc;
+    uint8_t unitstart;
+    uint8_t continuity;
+    uint8_t payload_offset;
+} ts_packet_t;
+
+typedef struct component_s {
+    uint8_t offset; // offset in the TS_PACKET
+    uint8_t stream_type;
+    uint16_t elementary_PID;
+} component_t;
 
 typedef struct pmt_data_s {
     uint16_t pid;
@@ -45,7 +75,8 @@ typedef struct pmt_data_s {
     uint16_t pmt_idx;
     uint8_t data[TS_PACKET_LENGTH];
     uint16_t pcrpid;
-    uint16_t epid;
+    component_t components[MAX_COMPONENTS_NUM];
+    uint8_t     component_num;
 } pmt_data_t;
 
 typedef struct merge_context_s {
@@ -56,6 +87,13 @@ typedef struct merge_context_s {
     FILE *out;
 } merge_context_t;
 
+bool parse_ts_packet(const uint8_t *data, ts_packet_t *packed);
 size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2);
+bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt);
+void pmt_update_crc(pmt_data_t *pmt);
+
+bool adts_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
+bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
+bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
 
 #endif /* defined(__HLS_DownLoad__mpegts__) */

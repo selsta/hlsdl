@@ -6,7 +6,7 @@ This program converts .m3u8 playlists to a .ts video. It supports decryption of 
 Requirements
 ------------
 
-This program requires FFmpeg installed in order to decrypt SAMPLE-AES content.
+This program does NOT require FFmpeg installed in order to decrypt SAMPLE-AES content.
 
 Build
 -----
@@ -53,8 +53,5 @@ Usage and Options
 
 -a ... Set additional url to the audio media playlist.
 ```
-Todo
-----
 
-- remove ffmpeg dependency and use own simple mpegts demux implementation
 

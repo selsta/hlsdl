@@ -269,6 +269,7 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                 ms->url = malloc(url_size);
                 strncpy(ms->url, src, url_size-1);
                 ms->url[url_size-1] = '\0';
+                ms->sequence_number = i + me->first_media_sequence;
                 if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
                     memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
                     memcpy(ms->enc_aes.iv_value, me->enc_aes.iv_value, KEYLEN);
@@ -285,8 +286,6 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                 
                 /* Get full url */
                 extend_url(&(ms->url), me->url);
-                
-                ms->sequence_number = i + me->first_media_sequence;
                 
                 ms->size = seg_size;
                 if (seg_size >= 0) {
@@ -541,7 +540,6 @@ finish:
     return 0;
 }
 
-
 #if defined(WITH_FFMPEG) && WITH_FFMPEG 
 static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *buf)
 {
@@ -686,7 +684,7 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
                     p = nal_end;
                     continue;
                 } else {
-                    // Remove the start code emulation prevention.
+                    // Remove the start code emulation prevention
                     for (int i = 0; i < 4; i++) {
                         uint8_t *tmp = p;
                         while ((tmp = memmem(tmp, nal_end - tmp, h264_scep_search[i], 4))) {
@@ -755,20 +753,486 @@ static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *bu
     return 0;
 }
 
+#else  // #if defined(WITH_FFMPEG) && WITH_FFMPEG 
+
+
+static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const uint8_t *pcr, uint16_t pid, uint8_t *cont_count)
+{
+    uint8_t *av_data = in->data;
+    uint32_t av_size = in->pos;
+
+    uint8_t ts_header[4] = {TS_SYNC_BYTE, 0x40, 0x00, 0x10}; 
+    ts_header[1] = ((pid >> 8) & 0x1F) | 0x40; // 0x40 - set payload_unit_start_indicator
+    ts_header[2] = pid & 0xFF;
+    
+    uint8_t adapt_header[8] = {0x00};
+    uint8_t adapt_header_size = 0;
+    uint32_t payload_size = TS_PACKET_LENGTH - sizeof(ts_header);
+    if (pcr[0] & 0x10) {
+        adapt_header_size = 8; 
+        adapt_header[1] = pcr[0] & 0xF0; // set previus flags: discontinuity_indicator, random_access_indicator, elementary_stream_priority_indicator, PCR_flag
+    } else if (pcr[0] & 0x20) {
+        adapt_header_size = 2;
+        adapt_header[1] = pcr[0] & 0xF0; // restore flags as described above
+    } else if (av_size < payload_size) {
+        adapt_header_size = payload_size - av_size == 1 ? 1 : 2;
+    }
+
+    payload_size -= adapt_header_size;
+
+    if (adapt_header_size) {
+        adapt_header[0] = adapt_header_size - 1; // size without field size
+        if (av_size < payload_size) {
+            adapt_header[0] += payload_size - av_size;
+        }
+
+        if (adapt_header[0]) {
+            ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag
+        }
+    }
+
+    // ts header
+    ts_header[3] = (ts_header[3] & 0xf0) | (*cont_count);
+    *cont_count = (*cont_count + 1) % 16;
+    memcpy(&out->data[out->pos], ts_header, sizeof(ts_header));
+    out->pos += sizeof(ts_header);
+
+    // adaptation field
+    if (adapt_header_size) {
+        memcpy(&out->data[out->pos], adapt_header, adapt_header_size);
+        out->pos += adapt_header_size;
+    }
+
+    if (av_size < payload_size) {
+        uint32_t s;
+        for(s=0; s < payload_size - av_size; ++s) {
+            out->data[out->pos + s] = 0xff;
+        }
+        out->pos += payload_size - av_size;
+        payload_size = av_size;
+    }
+
+    memcpy(&out->data[out->pos], av_data, payload_size);
+    out->pos += payload_size;
+    av_data += payload_size;
+    av_size -= payload_size;
+
+    if (av_size > 0) {
+        uint32_t packets_num = av_size / (TS_PACKET_LENGTH - 4);
+        uint32_t p;
+        ts_header[1] &= 0xBF; // unset payload_unit_start_indicator
+        ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
+        for (p=0; p < packets_num; ++p) {
+           ts_header[3] = (ts_header[3] & 0xf0) | (*cont_count);
+           *cont_count = (*cont_count + 1) % 16;
+           memcpy(&out->data[out->pos], ts_header, sizeof(ts_header));
+           memcpy(&out->data[out->pos+4], av_data, TS_PACKET_LENGTH - sizeof(ts_header));
+           out->pos += TS_PACKET_LENGTH;
+           av_data += TS_PACKET_LENGTH - sizeof(ts_header);
+           av_size -= TS_PACKET_LENGTH - sizeof(ts_header);
+        }
+
+        ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add aligment
+        adapt_header[1] = 0; // none flags set, only for alignment
+        if (av_size > 0) {
+            ts_header[3] = (ts_header[3] & 0xf0) | (*cont_count);
+            *cont_count = (*cont_count + 1) % 16;
+            // add ts_header
+            memcpy(&out->data[out->pos], ts_header, sizeof(ts_header));
+
+            // add adapt header
+            adapt_header_size = TS_PACKET_LENGTH - 4 - av_size == 1 ? 1 : 2;
+            adapt_header[0] = adapt_header_size - 1; // size without field size
+            if (adapt_header[0]) {
+                adapt_header[0] +=  TS_PACKET_LENGTH - 4 - 2 - av_size;
+            }
+
+            memcpy(&out->data[out->pos+4], adapt_header, adapt_header_size);
+            out->pos += 4 + adapt_header_size;
+
+            // add alignment
+            if (adapt_header[0]) {
+                int32_t s;
+                for(s=0; s < adapt_header[0] - 1; ++s) {
+                    out->data[out->pos + s] = 0xff;
+                }
+                out->pos += adapt_header[0] -1;
+            }
+
+            // add payload
+            memcpy(out->data + out->pos, av_data, av_size);
+            out->pos += av_size;
+            av_data += av_size;
+            av_size -= av_size;
+        }
+    }
+    
+    return 0;
+}
+
+
+static uint8_t * remove_emulation_prev(const uint8_t  *src,
+                                       const uint8_t  *src_end,
+                                             uint8_t  *dst,
+                                             uint8_t  *dst_end)
+{
+    while (src + 2 < src_end)
+        if (!*src && !*(src + 1) && *(src + 2) == 3) {
+            *dst++ = *src++;
+            *dst++ = *src++;
+            src++; // remove emulation_prevention_three_byte
+        } else
+            *dst++ = *src++;
+
+    while (src < src_end)
+        *dst++ = *src++;
+        
+    return dst;
+}
+
+static uint8_t *ff_avc_find_startcode_internal(uint8_t *p, uint8_t *end)
+{
+    uint8_t *a = p + 4 - ((intptr_t)p & 3);
+
+    for (end -= 3; p < a && p < end; p++) {
+        if (p[0] == 0 && p[1] == 0 && p[2] == 1)
+            return p;
+    }
+
+    for (end -= 3; p < end; p += 4) {
+        uint32_t x = *(uint32_t*)p;
+        if ((x - 0x01010101) & (~x) & 0x80808080) { // generic
+            if (p[1] == 0) {
+                if (p[0] == 0 && p[2] == 1)
+                    return p;
+                if (p[2] == 0 && p[3] == 1)
+                    return p+1;
+            }
+            if (p[3] == 0) {
+                if (p[2] == 0 && p[4] == 1)
+                    return p+2;
+                if (p[4] == 0 && p[5] == 1)
+                    return p+3;
+            }
+        }
+    }
+
+    for (end += 3; p < end; p++) {
+        if (p[0] == 0 && p[1] == 0 && p[2] == 1)
+            return p;
+    }
+
+    return end + 3;
+}
+
+static uint8_t *ff_avc_find_startcode(uint8_t *p, uint8_t *end){
+    uint8_t *out= ff_avc_find_startcode_internal(p, end);
+    if(p<out && out<end && !out[-1]) out--;
+    return out;
+}
+
+static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in, int size)
+{
+    uint8_t *end = buf_in + size;
+    uint8_t *nal_start;
+    uint8_t *nal_end;
+
+    end = remove_emulation_prev(buf_in, end, buf_in, end);
+
+    nal_start = ff_avc_find_startcode(buf_in, end);
+    for (;;) {
+        while (nal_start < end && !*(nal_start++));
+        if (nal_start == end)
+            break;
+
+        nal_end = ff_avc_find_startcode(nal_start, end);
+        // NAL unit with length of 48 bytes or fewer is completely unencrypted.
+        if (nal_end - nal_start > 48) {
+            nal_start += 32;
+            void *ctx = AES128_CBC_CTX_new();
+            AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
+            while (nal_start + 16 < nal_end) {
+                AES128_CBC_DecryptUpdate(ctx, nal_start, nal_start, 16);
+                nal_start += 16 * 10; // Each 16-byte block of encrypted data is followed by up to nine 16-byte blocks of unencrypted data. 
+            }
+            AES128_CBC_free(ctx);
+        }
+        nal_start = nal_end;
+    }
+    return end - buf_in;
+}
+
+static int sample_aes_decrypt_audio_data(hls_media_segment_t *s, uint8_t *ptr, uint32_t size, audiotype_t audio_codec)
+{
+    bool (* get_next_frame)(const uint8_t **, const uint8_t *, uint32_t *);
+    switch (audio_codec)
+    {
+    case AUDIO_ADTS:
+        get_next_frame = adts_get_next_frame;
+        break;
+    case AUDIO_AC3:
+        get_next_frame = ac3_get_next_frame;
+        break;
+    case AUDIO_EC3:
+        get_next_frame = ec3_get_next_frame;
+        break;
+    case AUDIO_UNKNOWN:
+    default:
+        MSG_ERROR("Wrong audio_codec! Should never happen here > EXIT!\n");
+        exit(1);
+    }
+
+    uint8_t *audio_frame = ptr;
+    uint8_t *end_ptr = ptr + size;
+    uint32_t frame_length = 0;
+    while (get_next_frame((const uint8_t **)&audio_frame, end_ptr, &frame_length)) {
+        // The IV must be reset at the beginning of every packet.
+        uint8_t leaderSize = 0;
+
+        if (audio_codec == AUDIO_ADTS) {
+            // ADTS headers can contain CRC checks.
+            // If the CRC check bit is 0, CRC exists.
+            //
+            // Header (7 or 9 byte) + unencrypted leader (16 bytes)
+            leaderSize = (audio_frame[1] & 0x01) ? 23 : 25;
+        } else { // AUDIO_AC3, AUDIO_EC3
+            // AC3 Audio is untested. Sample streams welcome.
+            //
+            // unencrypted leader
+            leaderSize = 16;
+        }
+        
+        int tmp_size = frame_length > leaderSize ? (frame_length - leaderSize) & 0xFFFFFFF0  : 0;
+        if (tmp_size) {
+            void *ctx = AES128_CBC_CTX_new();
+            AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
+            AES128_CBC_DecryptUpdate(ctx, audio_frame + leaderSize, audio_frame + leaderSize, tmp_size);
+            AES128_CBC_free(ctx);
+        }
+
+        audio_frame += frame_length;
+    }
+
+    return 0;
+}
+
+
+static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out, ByteBuffer_t *in, uint8_t *pcr, uint16_t pid, audiotype_t audio_codec, uint8_t *counter)
+{
+    uint16_t pes_header_size = 0;
+
+    // we need to skip PES header it is not part of NAL unit
+    if (in->pos <= PES_HEADER_SIZE || in->data[0] != 0x00 || in->data[1] != 0x00 || in->data[1] == 0x01) {
+        MSG_ERROR("Wrong or missing PES header!\n");
+        return -1;
+    }
+
+    pes_header_size = in->data[8] + 9;
+    if (pes_header_size >= in->pos) {
+        MSG_ERROR("Wrong PES header size %hu!\n", &pes_header_size);
+        return -1;
+    }
+    
+    if (AUDIO_UNKNOWN == audio_codec) {
+        // handle video data in NAL units
+        int size = sample_aes_decrypt_nal_units(s, in->data + pes_header_size, in->pos - pes_header_size) + pes_header_size;
+
+        // to check if I did not any mistake in offset calculation
+        if (size > in->pos) {
+            MSG_ERROR("NAL size after decryption is grater then before - before: %d, after: %d - should never happen!\n", size);
+            exit(-1);
+        }
+
+        // output size could be less then input because the start code emulation prevention could be removed if available
+        if (size < in->pos) {
+            // we need to update size in the PES header if it was set
+            int32_t payload_size = ((uint16_t)(in->data[4]) << 8) | in->data[5];
+            if (payload_size > 0) {
+                payload_size -=  in->pos - size;
+                in->data[4] = (payload_size >> 8) & 0xff;
+                in->data[5] = payload_size & 0xff;
+            }
+            in->pos = size;
+        }
+    } else {
+        sample_aes_decrypt_audio_data(s, in->data + pes_header_size, in->pos - pes_header_size, audio_codec);
+    }
+
+    return sample_aes_append_av_data(out, in, pcr, pid, counter);
+}
+
+static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
+{
+    int ret = 0;
+    fill_key_value(&(s->enc_aes));
+    if (buf->len > TS_PACKET_LENGTH && buf->data[0] == TS_SYNC_BYTE) {
+        pmt_data_t pmt = {0};
+        if (find_pmt(buf->data, buf->len, &pmt)) {
+            bool write_pmt = true;
+            uint16_t audio_PID = PID_UNSPEC;
+            uint16_t video_PID = PID_UNSPEC;
+            audiotype_t audio_codec = AUDIO_UNKNOWN;
+            uint32_t i;
+            // https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/HLS_Sample_Encryption/TransportStreamSignaling/TransportStreamSignaling.html
+            for (i=0; i < pmt.component_num; ++i) {
+                uint8_t stream_type = pmt.components[i].stream_type;
+                switch (stream_type) {
+                    case 0xdb:
+                        video_PID = pmt.components[i].elementary_PID;
+                        stream_type = 0x1B; // AVC video stream as defined in ITU-T Rec. H.264 | ISO/IEC 14496-10 Video, or AVC base layer of an HEVC video stream as defined in ITU-T H.265 | ISO/IEC 23008-2 
+                        break;
+                    case 0xcf:
+                        audio_codec = AUDIO_ADTS;
+                        audio_PID = pmt.components[i].elementary_PID;
+                        stream_type = 0x0F; // ISO/IEC 13818-7 Audio with ADTS transport syntax
+                        break;
+                    case 0xc1:
+                        audio_codec = AUDIO_AC3;
+                        audio_PID = pmt.components[i].elementary_PID;
+                        stream_type = 0x81; // User Private / AC-3 (ATSC)
+                        break;
+                    case 0xc2:
+                        audio_codec = AUDIO_EC3;
+                        audio_PID = pmt.components[i].elementary_PID;
+                        stream_type = 0x87; // User Private / E-AC-3 (ATSC)
+                        break;
+                    default:
+                        MSG_DBG("Unknown component type: 0x%02hhx, pid: 0x%03hx\n", pmt.components[i].stream_type, pmt.components[i].elementary_PID);
+                        break;
+                }
+
+                if (stream_type != pmt.components[i].stream_type) {
+                    // we update stream type to reflect unencrypted data
+                    pmt.components[i].stream_type = stream_type;
+                    pmt.data[pmt.components[i].offset] = stream_type;
+                }
+            }
+
+            if (audio_PID != PID_UNSPEC || video_PID != PID_UNSPEC) {
+                uint8_t audio_counter = 0;
+                uint8_t video_counter = 0;
+                uint8_t audio_pcr[7]; // first byte is adaptation filed flags
+                uint8_t video_pcr[7]; // - || -
+                ByteBuffer_t outBuffer = {NULL};
+                outBuffer.data = malloc(buf->len);
+                outBuffer.len = buf->len;
+
+                ByteBuffer_t audioBuffer = {NULL};
+                ByteBuffer_t videoBuffer = {NULL};
+
+                if (audio_PID != PID_UNSPEC) {
+                    audioBuffer.data = malloc(buf->len);
+                    audioBuffer.len = buf->len;
+                }
+
+                if (video_PID != PID_UNSPEC) {
+                    videoBuffer.data = malloc(buf->len);
+                    videoBuffer.len = buf->len;
+                }
+
+                // collect all audio and video data
+                uint32_t packet_id = 0;
+                uint8_t *ptr = buf->data;
+                uint8_t *end = ptr + buf->len;
+                while (ptr + TS_PACKET_LENGTH <= end) {
+                    if (*ptr != TS_SYNC_BYTE) {
+                        MSG_WARNING("Expected sync byte but got 0x%02hhx!\n", *ptr);
+                        ptr += 1;
+                        continue;
+                    }
+                    ts_packet_t packed = {0};
+                    parse_ts_packet(ptr, &packed);
+
+                    if (packed.pid == pmt.pid) {
+                        if (write_pmt) {
+                            write_pmt = false;
+                            pmt_update_crc(&pmt);
+                            memcpy(&outBuffer.data[outBuffer.pos], pmt.data, TS_PACKET_LENGTH);
+                            outBuffer.pos += TS_PACKET_LENGTH;
+                        }
+                    } else if (packed.pid == audio_PID || packed.pid == video_PID) {
+                        ByteBuffer_t *pCurrBuffer = packed.pid == audio_PID ? &audioBuffer : &videoBuffer;
+                        uint8_t *pcr = packed.pid == audio_PID ? audio_pcr : video_pcr;
+                        uint8_t *counter = packed.pid == audio_PID ? &audio_counter : &video_counter;
+                        
+                        if (packed.unitstart) {
+                            // consume previous data if any
+                            if (pCurrBuffer->pos) {
+                                sample_aes_handle_pes_data(s, &outBuffer, pCurrBuffer, pcr, packed.pid, packed.pid == audio_PID ? audio_codec : AUDIO_UNKNOWN, counter);
+                            }
+                            
+                            if ((packed.afc & 2) && (ptr[5] & 0x10)) { // remember PCR if available
+                                memcpy(pcr, ptr + 4 + 1, 6);
+                            } else if ((packed.afc & 2) && (ptr[5] & 0x20)) { // remember discontinuity_indicator if set
+                                pcr[0] = ptr[5];
+                            } else {
+                                pcr[0] = 0;
+                            }
+                            pCurrBuffer->pos = 0;
+                        }
+                        
+                        if (packed.payload_offset < TS_PACKET_LENGTH) {
+                            memcpy(&(pCurrBuffer->data[pCurrBuffer->pos]), ptr + packed.payload_offset, TS_PACKET_LENGTH - packed.payload_offset);
+                            pCurrBuffer->pos += TS_PACKET_LENGTH - packed.payload_offset;
+                        }
+                    } else {
+                        memcpy(&outBuffer.data[outBuffer.pos], ptr, TS_PACKET_LENGTH);
+                        outBuffer.pos += TS_PACKET_LENGTH;
+                    }
+                    
+                    ptr += TS_PACKET_LENGTH;
+                    packet_id += 1;
+                }
+                
+                if (audioBuffer.pos) {
+                    sample_aes_handle_pes_data(s, &outBuffer, &audioBuffer, audio_pcr, audio_PID, audio_codec, &audio_counter);
+                }
+                
+                if (videoBuffer.pos) {
+                    sample_aes_handle_pes_data(s, &outBuffer, &videoBuffer, video_pcr, video_PID, AUDIO_UNKNOWN, &video_counter);
+                }
+                
+                if (outBuffer.pos > buf->len ) {
+                    MSG_ERROR("decrypt_sample_aes - buffer overflow detected!\n");
+                    exit(-1);
+                }
+                
+                free(videoBuffer.data);
+                free(audioBuffer.data);
+                
+                // replace encrypted data with decrypted one
+                free(buf->data);
+                buf->data = outBuffer.data;
+                buf->len = outBuffer.pos;
+            } else {
+                MSG_WARNING("None audio nor video component found!\n");
+                ret = -3;
+            }
+        } else {
+            MSG_WARNING("PMT could not be found!\n");
+            ret = -2;
+        }
+    } else {
+        MSG_WARNING("Unknown segment type!\n");
+        ret = -1;
+    }
+    
+    return ret;
+}
 #endif
 
-static int decrypt_aes128(struct hls_media_segment *s, struct ByteBuffer *buf)
+static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
 {
     // The AES128 method encrypts whole segments.
     // Simply decrypting them is enough.
-    uint8_t *db = malloc(buf->len);
-    
     fill_key_value(&(s->enc_aes));
-    AES128_CBC_decrypt_buffer(db, buf->data, (uint32_t)buf->len,
-                              s->enc_aes.key_value, s->enc_aes.iv_value);
-    memcpy(buf->data, db, buf->len);
-    
-    free(db);
+
+    int out_size = 0;
+    void *ctx = AES128_CBC_CTX_new();
+    AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, true);
+    AES128_CBC_DecryptPadded(ctx, buf->data, buf->data, buf->len, &out_size);
+    // decoded data size could be less then input because of the padding
+    buf->len = out_size;
     return 0;
 }
 
@@ -1073,11 +1537,7 @@ int download_live_hls(hls_media_playlist_t *me)
             if (me->encryption == true && me->encryptiontype == ENC_AES128) {
                 decrypt_aes128(ms, &seg);
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
                 decrypt_sample_aes(ms, &seg);
-#else
-                MSG_API("{\"error_code\":-12, \"error_msg\":\"no_ffmpeg\"}\n");
-#endif
             }
             download_size += fwrite(seg.data, 1, seg.len, pFile);
             free(seg.data);
@@ -1156,11 +1616,7 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
             decrypt_aes128(ms, seg);
         } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
             decrypt_sample_aes(ms, seg);
-#else
-            MSG_API("{\"error_code\":-12, \"error_msg\":\"no_ffmpeg\"}\n");
-#endif
         }
     }
 
@@ -1238,12 +1694,12 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
     }
 
     while(ms) {
-
         if (0 != vod_download_segment(&session, me, ms, &seg)) {
             break;
         }
 
-        if (ms_audio) {
+        // first segment should be TS for success merge 
+        if (ms_audio && seg.len > TS_PACKET_LENGTH && seg.data[0] == TS_SYNC_BYTE) {
             if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
                 break;
             }

@@ -134,60 +134,79 @@ int main(int argc, char *argv[])
         }
         
         if (selected->audio_grp) {
-            // print hls master playlist
-            int i = 1;
-            int audio_choice = 0;
-            
-            hls_audio_t *audio = NULL;
+            // check if have valid group
             hls_audio_t *selected_audio = NULL;
-            if (!hls_args.use_best) {
-                audio = master_playlist.audio;
-                while (audio) {
-                    if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                        MSG_PRINT("%d: Name: %s, Language: %s\n", i, audio->name, audio->lang ? audio->lang : "unknown");
-                        i += 1;
-                    }
-                    audio = audio->next;
-                }
-
-                MSG_PRINT("Which Language should be downloaded? ");
-                if (scanf("%d", &audio_choice) != 1 || audio_choice <= 0 || audio_choice >= i) {
-                    MSG_ERROR("Wrong input!\n");
-                    exit(1);
-                }
-            } else {
-                audio_choice = 1;
-                i = 0;
-                audio = master_playlist.audio;
-                while (audio) {
-                    if (0 == strcmp(audio->grp_id, selected->audio_grp) && audio->is_default) {
-                        i += 1;
-                        audio_choice = i;
-                        break;
-                    }
-                    audio = audio->next;
-                }
-            }
+            hls_audio_t *audio = master_playlist.audio;
+            bool has_audio_playlist = false;
             
-            i = 0;
-            audio = master_playlist.audio;
             while (audio) {
                 if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                    i += 1;
-                    if (i == audio_choice) {
-                        selected_audio = audio;
+                    if (has_audio_playlist) {
+                        selected_audio = NULL; // more then one audio playlist, so selection is needed
                         break;
+                    } else {
+                        has_audio_playlist = true;
+                        selected_audio = audio;
                     }
                 }
-                audio = audio->next;
             }
+            
+            if (has_audio_playlist) {
+                // print hls master playlist
+                int audio_choice = 0;
+                int i = 1;
+                
+                if (!selected_audio) {
+                    if (!hls_args.use_best) {
+                        audio = master_playlist.audio;
+                        while (audio) {
+                            if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
+                                MSG_PRINT("%d: Name: %s, Language: %s\n", i, audio->name, audio->lang ? audio->lang : "unknown");
+                                i += 1;
+                            }
+                            audio = audio->next;
+                        }
 
-            if (!selected_audio) {
-                MSG_ERROR("Wrong selection!\n");
-                exit(1);
+                        MSG_PRINT("Which Language should be downloaded? ");
+                        if (scanf("%d", &audio_choice) != 1 || audio_choice <= 0 || audio_choice >= i) {
+                            MSG_ERROR("Wrong input!\n");
+                            exit(1);
+                        }
+                    } else {
+                        audio_choice = 1;
+                        i = 0;
+                        audio = master_playlist.audio;
+                        while (audio) {
+                            if (0 == strcmp(audio->grp_id, selected->audio_grp) && audio->is_default) {
+                                i += 1;
+                                audio_choice = i;
+                                break;
+                            }
+                            audio = audio->next;
+                        }
+                    }
+                    
+                    i = 0;
+                    audio = master_playlist.audio;
+                    while (audio) {
+                        if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
+                            i += 1;
+                            if (i == audio_choice) {
+                                selected_audio = audio;
+                                break;
+                            }
+                        }
+                        audio = audio->next;
+                    }
+
+                    if (!selected_audio) {
+                        MSG_ERROR("Wrong selection!\n");
+                        exit(1);
+                    }
+                }
+
+                audio_media_playlist.orig_url = strdup(selected_audio->url);
             }
-
-            audio_media_playlist.orig_url = strdup(selected_audio->url);
         }
         
         // make copy of structure 

@@ -59,17 +59,7 @@ const uint16_t ac3_frame_size_tab[38][3] = {
     { 1280, 1394, 1920 },
 };
 
-typedef enum raw_audiotype_e{
-	RAW_AUDIO_UNKNOWN,
-    RAW_AUDIO_ADTS,
-	RAW_AUDIO_AC3,
-	RAW_AUDIO_EC3
-} raw_audiotype_t;
-
 #define INVALID_PTS_VALUE   0x200000000ull
-#define MAX_PES_PACKET_SIZE        (65535)
-#define PES_HEADER_SIZE                  9
-#define PES_HEADER_WITH_PTS_SIZE        14
 
 typedef struct BitPacker_s
 {
@@ -308,34 +298,58 @@ static pidtype_t get_pid_type(uint16_t pid)
     return pidtype;
 }
 
-static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
+bool parse_ts_packet(const uint8_t *data, ts_packet_t *packed)
 {
     const uint8_t *bufp = data;
 
     // packed parsing
 
     bufp++; /* Skip sync byte */
-    uint8_t unitstart = (bufp[0] & 0x40) >> 6; // payload_unit_start_indicator - 1b
+    packed->unitstart = (bufp[0] & 0x40) >> 6; // payload_unit_start_indicator - 1b
     // transport_priority - 1b
-    pmt->pid = ((bufp[0] & 0x1f) << 8) | bufp[1]; // PID - 13b
+    packed->pid = ((bufp[0] & 0x1f) << 8) | bufp[1]; // PID - 13b
     // transport_scrambling_control - 2b
-    uint16_t afc = (bufp[2] & 0x30) >> 4; // adaptation_field_control - 2b
-    uint16_t continuity = bufp[2] & 0x0f; // continuity_counter - 4b
-    if (continuity != 0 || (afc & 2))
-    {
-        MSG_WARNING("Not supported format afc: 0x%hhx, continuity: 0x%hhx\n", afc, continuity);
-        //return false;
-    }
+    packed->afc = (bufp[2] & 0x30) >> 4; // adaptation_field_control - 2b
+    packed->continuity = bufp[2] & 0x0f; // continuity_counter - 4b
+
     bufp += 3;
-    if (unitstart)
+    if (packed->afc & 2)
     {
         bufp += bufp[0] + 1;
+    } 
+    /*
+    else if (packed->unitstart)
+    {
+        bufp += 1;
     }
+    */
+    
+    packed->payload_offset = bufp - data;
+    return true;
+}
+
+
+static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
+{
+    const uint8_t *bufp = data;
+    ts_packet_t packed;
+    
+    parse_ts_packet(bufp, &packed);
+
+    if (packed.continuity != 0)
+    {
+        //MSG_WARNING("Not supported format continuity: 0x%hhx\n", packed.continuity);
+        //return false;
+    }
+
+    pmt->pid = packed.pid;
+    bufp += packed.payload_offset + 1;
 
     // section parssing
     uint8_t tableid = bufp[0]; // table_id - 8b
     if(TID_PMT != tableid)
     {
+        MSG_WARNING("PMT wrong table id: 0x%hhx\n", tableid);
         return false;
     }
     uint8_t syntax = (bufp[1] & 0x80) >> 7; // section_syntax_indicator - 1b
@@ -385,29 +399,36 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
     // descriptor
     bufp += desclen;
     pmt->componennt_idx = bufp - data; //ppmt;
-
     while (pmt->pmt_sectionlen - (bufp - ppmt) - 4)
     {
-        // uint8_t stype = bufp[0]; // stream_type - 8b
+        uint8_t offset = bufp - data; // offset in the TS_PACKET
+        uint8_t stype = bufp[0]; // stream_type - 8b
         bufp+=1;
         // reserved - 3b
-        pmt->epid = ((bufp[0] & 0x1f) << 8) | bufp[1]; // elementary_PID - 13b
+        uint16_t epid = ((bufp[0] & 0x1f) << 8) | bufp[1]; // elementary_PID - 13b
         bufp += 2;
         // reserved - 4b
         uint16_t infolen = ((bufp[0] & 0x0f) << 8) | bufp[1];// ES_info_length - 12b
         bufp += 2;
         bufp += infolen;
-        if (pmt->pmt_sectionlen - 4 != (bufp - ppmt))
+        if (pmt->component_num >= sizeof(pmt->components) / sizeof(pmt->components[0]))
         {
-            MSG_ERROR("PMT section contain more then one component, rest data: 0x%x\n", ((int32_t)pmt->pmt_sectionlen) - (bufp - ppmt) - 4);
+            MSG_ERROR("PMT section contain to manny components!\n");
             return false;
         }
+
+        pmt->components[pmt->component_num].offset = offset;
+        pmt->components[pmt->component_num].stream_type = stype;
+        pmt->components[pmt->component_num].elementary_PID = epid;
+        pmt->component_num += 1;
     }
+
     return true;
 }
 
-static bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt)
+bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt)
 {
+    // maybe better will be to find PAT first and then we will know PMT PID
     while (size > TS_PACKET_LENGTH)
     {
         if (TS_SYNC_BYTE == bufp[0])
@@ -457,6 +478,12 @@ static bool merge_pmt_with_audio_component(const pmt_data_t *pmt1, const uint8_t
     pmt->data[pmt->pmt_idx + 1] = (pmt->data[pmt->pmt_idx + 1] & 0xf0) | (sectionlen & 0x0F00) >> 8;
     pmt->data[pmt->pmt_idx + 2] = (sectionlen & 0x00FF);
 
+    pmt_update_crc(pmt);
+    return true;
+}
+
+void pmt_update_crc(pmt_data_t *pmt)
+{
     // update crc
     uint32_t crc = crc32(pmt->data + pmt->pmt_idx, pmt->pmt_sectionlen-4);
 
@@ -464,15 +491,21 @@ static bool merge_pmt_with_audio_component(const pmt_data_t *pmt1, const uint8_t
     pmt->data[pmt->pmt_idx + pmt->pmt_sectionlen - 3] = (crc >> 16) & 0xff;
     pmt->data[pmt->pmt_idx + pmt->pmt_sectionlen - 2] = (crc >> 8) & 0xff;
     pmt->data[pmt->pmt_idx + pmt->pmt_sectionlen - 1] = crc & 0xff;
-    return true;
 }
 
 static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t *pmt)
 {
-    if (pmt1->epid == pmt2->epid)
+    bool bRet = false;
+
+    if (sizeof(pmt1->components) / sizeof(pmt1->components[0]) <= pmt1->component_num)
     {
-        MSG_ERROR("Same elementary pids %04x == %04x!!!\n", (uint32_t)pmt1->epid, (uint32_t)pmt2->epid);
-        return false;
+        MSG_ERROR("Components table to small!!!\n");
+        exit(-13);
+    }
+
+    if (pmt2->component_num > 1)
+    {
+        MSG_WARNING("Audio fragment has more then one component in the PMT component_num: %u!!!!\n", (uint32_t)pmt2->component_num);
     }
 
     if (pmt1->program != pmt2->program)
@@ -483,8 +516,27 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
 
     uint32_t len2 = pmt2->pmt_idx + pmt2->pmt_sectionlen;
     uint32_t component_len2 = len2 - pmt2->componennt_idx - 4; 
+    uint8_t *ptr = malloc(component_len2);
 
-    return merge_pmt_with_audio_component(pmt1, pmt2->data + pmt2->componennt_idx, component_len2, pmt);
+    // assign new elementary pid for component
+    uint16_t ePID = pmt1->components[pmt1->component_num-1].elementary_PID + 23;
+
+    // update elementary_PID in component data
+    memcpy(ptr, pmt2->data + pmt2->componennt_idx, component_len2);
+    ptr[1] = ePID >> 8;
+    ptr[2] = ePID & 0xFF;
+
+    bRet = merge_pmt_with_audio_component(pmt1, ptr, component_len2, pmt);
+    free(ptr);
+
+    if (bRet)
+    {
+        // add new component to component table
+        pmt->components[pmt->component_num] = pmt2->components[0];
+        pmt->components[pmt->component_num].elementary_PID = ePID;
+        pmt->component_num += 1;
+    }
+    return bRet;
 }
 
 static const uint8_t* get_dts_from_id3(const uint8_t *buf, uint32_t size, int64_t *dts)
@@ -524,23 +576,23 @@ static const uint8_t* get_dts_from_id3(const uint8_t *buf, uint32_t size, int64_
     return NULL;
 }
 
-static bool adts_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+bool adts_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
 {
     for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
     {
-        /* check for sync bits 0xfff */
-        if ((*data_ptr)[0] != 0xff || ((*data_ptr)[1] & 0xf0) != 0xf0) continue;
+           /* check for sync bits 0xfff */
+           if ((*data_ptr)[0] != 0xff || ((*data_ptr)[1] & 0xf0) != 0xf0) continue;
 
-        *frame_length = ((uint32_t)((*data_ptr)[3] & 0x03) << 11) | ((uint32_t)(*data_ptr)[4] << 3) | ((uint32_t)((*data_ptr)[5] & 0xe0) >> 5);
+           *frame_length = ((uint32_t)((*data_ptr)[3] & 0x03) << 11) | ((uint32_t)(*data_ptr)[4] << 3) | ((uint32_t)((*data_ptr)[5] & 0xe0) >> 5);
 
-        /* sanity check on the frame length */
-        if (*frame_length < 1 || *frame_length > 8 * 768 + 7 + 2) continue;
-        return (*data_ptr) + (*frame_length) <= end_ptr;
+           /* sanity check on the frame length */
+           if (*frame_length < 1 || *frame_length > 8 * 768 + 7 + 2) continue;
+           return (*data_ptr) + (*frame_length) <= end_ptr;
     }
     return false;
 }
 
-static bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
 {
 
     for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
@@ -564,7 +616,7 @@ static bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr,
     return false;
 }
 
-static bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
+bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length)
 {
 
     for (; *data_ptr + 7 < end_ptr; *data_ptr += 1)
@@ -582,7 +634,7 @@ static bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr,
     return false;
 }
 
-static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2, int64_t dts, raw_audiotype_t audiotype)
+static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2, int64_t dts, audiotype_t audiotype)
 {
     uint8_t ts_header[4] = {TS_SYNC_BYTE, 0x00, 0x00, 0x10};
     uint8_t cont_count = 0;
@@ -594,22 +646,22 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
 
     switch (audiotype)
     {
-    case RAW_AUDIO_ADTS:
+    case AUDIO_ADTS:
         stream_type = 0xF; // stream_type: 0xF (15) => ISO/IEC 13818-7 Audio with ADTS transport syntax
         stream_id = 0xC0;  // stream_id: 0xC0 (192) => ISO/IEC 13818-3 or ISO/IEC 11172-3 or ISO/IEC 13818-7 or ISO/IEC 14496-3 audio stream number 0
         raw_audio_get_next_frame = adts_get_next_frame;
         break;
-    case RAW_AUDIO_AC3:
+    case AUDIO_AC3:
         stream_type = 0x81; // stream_type: 0x81 (129) => User Private / AC-3 (ATSC)
         stream_id = 0xBD;   // stream_id: 0xBD (189) => private_stream_1
         raw_audio_get_next_frame = ac3_get_next_frame;
         break;
-    case RAW_AUDIO_EC3:
+    case AUDIO_EC3:
         stream_type = 0x87; // stream_type: 0x87 (135) => User Private / E-AC-3 (ATSC)
         stream_id = 0xBD;   // stream_id: 0xBD (189) => private_stream_1
         raw_audio_get_next_frame = ec3_get_next_frame;
         break;
-    case RAW_AUDIO_UNKNOWN:
+    case AUDIO_UNKNOWN:
     default:
         MSG_ERROR("Wrong audiotype! Should never happen here > EXIT!\n");
         exit(1);
@@ -618,7 +670,7 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
     if ( !context->valid && find_pmt(pdata1, size1, &context->pmt1))
     {
         uint8_t component_audio[5] = {stream_type, 0x00, 0x00, 0x00, 0x00}; 
-        epid = context->pmt1.epid + 2;
+        epid = context->pmt1.components[0].elementary_PID + 2;
         component_audio[1] = (epid >> 8) & 0x1F;
         component_audio[2] = epid & 0xFF;
         if (merge_pmt_with_audio_component(&context->pmt1, component_audio, 5, &context->pmt))
@@ -633,7 +685,7 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
         return 0;
     }
 
-    epid = context->pmt1.epid + 2;
+    epid = context->pmt1.components[0].elementary_PID + 2;
     ts_header[1] = (epid >> 8) & 0x1F;
     ts_header[2] = epid & 0xFF;
 
@@ -732,7 +784,7 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                                uint8_t s;
                                uint8_t aflen = TS_PACKET_LENGTH - 4 - left_payload_size - 1;
                                uint8_t pattern = 0xff;
-                               ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add aligment
+                               ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add alignment
                                ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
                                cont_count = (cont_count + 1) % 16;
                                if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
@@ -776,12 +828,12 @@ static size_t merge_with_raw_audio(merge_context_t *context, const uint8_t *pdat
     int64_t dts;
     const uint8_t *ptr = get_dts_from_id3(pdata2, size2, &dts);
     if (ptr) {
-        raw_audiotype_t audiotype = RAW_AUDIO_UNKNOWN;
+        audiotype_t audiotype = AUDIO_UNKNOWN;
         size2 -= ptr - pdata2;
         
         if (size2 > 7 && ptr[0] == 0xFF && (ptr[1] & 0xf0)  == 0xF0) // ADTS syncword 0xFFF
         {
-            audiotype = RAW_AUDIO_ADTS;
+            audiotype = AUDIO_ADTS;
         } 
         else if (size2 > 7 && ptr[0] == 0x0B && ptr[1] == 0x77) // AC3, E-AC syncword 0x0B77
         { 
@@ -794,12 +846,12 @@ static size_t merge_with_raw_audio(merge_context_t *context, const uint8_t *pdat
             else if(bitstream_id <= 10)
             {
                 /* Normal AC-3 */
-                audiotype = RAW_AUDIO_AC3;
+                audiotype = AUDIO_AC3;
             }
             else 
             {
                 /* Enhanced AC-3 */
-                audiotype = RAW_AUDIO_EC3;
+                audiotype = AUDIO_EC3;
             }
         }
         else 
@@ -851,6 +903,7 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                 max2 = count2 / count1;
             }
 
+            bool write_pmt = true;
             uint32_t i = 0;
             uint32_t j = 0;
             while (i < count1 || j < count2)
@@ -867,8 +920,9 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                                 ret += TS_PACKET_LENGTH;
                             }
 
-                            if (TID_PAT == pid)
+                            if (TID_PAT == pid && write_pmt)
                             {
+                                write_pmt = false;
                                 if (fwrite(context->pmt.data, TS_PACKET_LENGTH, 1, context->out))
                                 {
                                     ret += TS_PACKET_LENGTH;
@@ -883,12 +937,19 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                     if (TS_SYNC_BYTE == pdata2[0])
                     {
                         uint16_t pid = ((pdata2[1] & 0x1f) << 8) | pdata2[2]; // PID - 13b
-                        if (TID_PAT != pid && pid != context->pmt2.pid)
+                        // if (TID_PAT != pid && pid != context->pmt2.pid)
+                        if (pid == context->pmt2.components[0].elementary_PID)
                         {
-                            if (fwrite(pdata2, TS_PACKET_LENGTH, 1, context->out))
-                            {
-                                ret += TS_PACKET_LENGTH;
-                            }
+                            if (fwrite(pdata2, 1, 1, context->out)) ret += 1;
+
+                            // we need to update PID
+                            pid = context->pmt.components[context->pmt.component_num-1].elementary_PID;
+                            uint8_t tmp[2];
+                            tmp[0] = (pdata2[1] & 0xE0) | (pid >> 8);
+                            tmp[1] = pid & 0xFF;
+                            if (fwrite(tmp, 2, 1, context->out)) ret += 2;
+
+                            if (fwrite(pdata2+3, TS_PACKET_LENGTH-3, 1, context->out)) ret += TS_PACKET_LENGTH-3;
                         }
                     }
                 }

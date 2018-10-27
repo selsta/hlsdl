@@ -14,7 +14,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.19\n");
+    printf("hlsdl v0.20\n");
     printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -117,6 +117,7 @@ int parse_argv(int argc, char * const argv[])
     return 1;
 }
 
+#if defined(WITH_FFMPEG) && WITH_FFMPEG 
 int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     struct ByteBuffer *bb = opaque;
@@ -147,19 +148,18 @@ int64_t seek(void *opaque, int64_t offset, int whence)
         case SEEK_END:
             bb->pos = (int)(bb->len - offset);
             break;
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
         case AVSEEK_SIZE:
             return bb->len;
             break;
-#endif
     }
     return bb->pos;
 }
 
-int bytes_remaining(uint8_t *pos, uint8_t *end)
+int bytes_remaining(const uint8_t *pos, const uint8_t *end)
 {
     return (int)(end - pos);
 }
+#endif
 
 int str_to_bin(uint8_t *data, char *hexstring, int len)
 {

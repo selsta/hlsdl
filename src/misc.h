@@ -9,11 +9,11 @@
 #define MAX_URL_LEN 2048
 #define HLSDL_MAX_NUM_OF_CUSTOM_HEADERS 256
 
-struct ByteBuffer {
+typedef struct ByteBuffer {
     uint8_t *data;
     int len;
     int pos;
-};
+} ByteBuffer_t;
 
 struct hls_args {
     int loglevel;
@@ -53,9 +53,12 @@ static const uint8_t h264_scep_replace[4][3] =
 
 struct hls_args hls_args;
 
+#if defined(WITH_FFMPEG) && WITH_FFMPEG
 int read_packet(void *opaque, uint8_t *buf, int buf_size);
 int64_t seek(void *opaque, int64_t offset, int whence);
-int bytes_remaining(uint8_t *pos, uint8_t *end);
+int bytes_remaining(const uint8_t *pos, const uint8_t *end);
+#endif
+
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);
 

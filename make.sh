@@ -5,7 +5,7 @@ set -e
 export CURL_TYPE="OPENSSL"
 
 MYTOPDIR=$PWD
-S_SRC="$MYTOPDIR/src/main.c $MYTOPDIR/src/aes.c $MYTOPDIR/src/curl.c $MYTOPDIR/src/hls.c $MYTOPDIR/src/misc.c $MYTOPDIR/src/msg.c $MYTOPDIR/src/mpegts.c"
+S_SRC="$MYTOPDIR/src/main.c $MYTOPDIR/src/aes_openssl.c $MYTOPDIR/src/curl.c $MYTOPDIR/src/hls.c $MYTOPDIR/src/misc.c $MYTOPDIR/src/msg.c $MYTOPDIR/src/mpegts.c"
 
 cd /mnt/new2/sysroots
 
