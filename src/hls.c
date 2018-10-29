@@ -391,7 +391,7 @@ static bool get_next_attrib(char **source, char **tag, char **val)
     }
 
     ptr = src;
-    while (*ptr != '=' && *ptr != '\0') ++ptr;
+    while (*ptr != '=' && *ptr != '\0' && !strchr("\n\r", *ptr)) ++ptr;
     if (*ptr != '\0') {
         token = src;
         *ptr = '\0';
@@ -405,7 +405,7 @@ static bool get_next_attrib(char **source, char **tag, char **val)
         }
 
         value = ptr;
-        while (*ptr != end_val_marker && *ptr != '\0') ++ptr;
+        while (*ptr != end_val_marker && *ptr != '\0' && !strchr("\n\r", *ptr)) ++ptr;
         src = ptr;
         if (*ptr) {
             ++src;
