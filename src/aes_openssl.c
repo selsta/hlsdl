@@ -25,8 +25,8 @@ int AES128_CBC_DecryptUpdate(void *ctx, uint8_t *plaintext, uint8_t *ciphertext,
     if (in_size > 0) {
         ret = EVP_DecryptUpdate(ctx, plaintext, &out_size, ciphertext, in_size);
         if (1 != ret || in_size != out_size) {
-            printf("AES128_CBC_DecryptUpdate failed: %d, in_size: %d, out_size: %d\n", ret, in_size, out_size);
-            exit(1);
+            MSG_ERROR("AES128_CBC_DecryptUpdate failed: %d, in_size: %d, out_size: %d\n", ret, in_size, out_size);
+            //exit(1);
         }
     }
     return ret;
@@ -44,8 +44,9 @@ int AES128_CBC_DecryptPadded(void *ctx, uint8_t *plaintext, uint8_t *ciphertext,
             *out_size += 1 == ret ? out_size2 : 0;
         }
         if (1 != ret) { // out size could be smaller then in because of padding
-            printf("AES128_CBC_DecryptUpdate failed: %d, in_size: %d, out_size: %d\n", ret, in_size, *out_size);
-            exit(1);
+            // this could fail because of temporary server problem, do not be so brutal to exit in such case
+            MSG_ERROR("AES128_CBC_DecryptUpdate failed: %d, in_size: %d, out_size: %d\n", ret, in_size, *out_size);
+            //exit(1);
         }
     }
     return ret;

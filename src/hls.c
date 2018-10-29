@@ -1227,12 +1227,24 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
     // Simply decrypting them is enough.
     fill_key_value(&(s->enc_aes));
 
-    int out_size = 0;
     void *ctx = AES128_CBC_CTX_new();
+    /* some AES-128 encrypted segments could be not correctly padded 
+     * and decryption with padding will fail - example stream with such problem is welcome
+     * From other hand dump correctly padded segment will contain trashes, which will cause many 
+     * errors during processing such TS, for example by DVBInspector,
+     * if padding will be not removed.
+     */
+#if 1
+    int out_size = 0;
     AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, true);
     AES128_CBC_DecryptPadded(ctx, buf->data, buf->data, buf->len, &out_size);
     // decoded data size could be less then input because of the padding
     buf->len = out_size;
+#else
+    AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
+    AES128_CBC_DecryptUpdate(ctx, buf->data, buf->data, buf->len);
+#endif
+    AES128_CBC_free(ctx);
     return 0;
 }
 
