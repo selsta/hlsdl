@@ -10,8 +10,12 @@ This program does NOT require FFmpeg installed in order to decrypt SAMPLE-AES co
 
 Build
 -----
-
+Linux:
 Use `make && make install && make clean` to install.
+
+Windows:
+https://github.com/samsamsam-iptvplayer/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
+
 
 Usage and Options
 -------
@@ -23,7 +27,7 @@ Usage and Options
 
 -v ... Verbose more information.
 
--o ... Choose name of output file.
+-o ... Choose name of output file ("-" alias for stdout).
 
 -u ... Set custom HTTP User-Agent header.
 
