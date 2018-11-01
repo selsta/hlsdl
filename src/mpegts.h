@@ -1,12 +1,8 @@
 #ifndef __HLS_DownLoad__mpegts__
 #define __HLS_DownLoad__mpegts__
 
-#ifndef _MSC_VER
 #include <stdbool.h>
 #include <stdint.h>
-#else
-#include "stdint.h"
-#endif
 
 #define TID_PAT                       0x00
 #define TID_CAT                       0x01

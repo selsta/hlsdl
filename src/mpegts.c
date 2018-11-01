@@ -198,7 +198,7 @@ static int32_t InsertPesHeader(uint8_t *data, int32_t size, uint8_t stream_id, u
 
     FlushBits(&ld2);
 
-    return (ld2.Ptr - data);
+    return (int32_t)(ld2.Ptr - data);
 }
 
 static const unsigned int crc32_table[] =
@@ -324,7 +324,7 @@ bool parse_ts_packet(const uint8_t *data, ts_packet_t *packed)
     }
     */
     
-    packed->payload_offset = bufp - data;
+    packed->payload_offset = (uint8_t)(bufp - data);
     return true;
 }
 
@@ -368,7 +368,7 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
         return false;
     }
 
-    pmt->pmt_idx = bufp - data;
+    pmt->pmt_idx = (uint16_t)(bufp - data);
     const uint8_t *ppmt = bufp;
     memcpy(pmt->data, data, TS_PACKET_LENGTH);
 
@@ -398,10 +398,10 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
     }
     // descriptor
     bufp += desclen;
-    pmt->componennt_idx = bufp - data; //ppmt;
+    pmt->componennt_idx = (uint16_t)(bufp - data); //ppmt;
     while (pmt->pmt_sectionlen - (bufp - ppmt) - 4)
     {
-        uint8_t offset = bufp - data; // offset in the TS_PACKET
+        uint8_t offset = (uint8_t)(bufp - data); // offset in the TS_PACKET
         uint8_t stype = bufp[0]; // stream_type - 8b
         bufp+=1;
         // reserved - 3b
@@ -829,7 +829,7 @@ static size_t merge_with_raw_audio(merge_context_t *context, const uint8_t *pdat
     const uint8_t *ptr = get_dts_from_id3(pdata2, size2, &dts);
     if (ptr) {
         audiotype_t audiotype = AUDIO_UNKNOWN;
-        size2 -= ptr - pdata2;
+        size2 -= (uint32_t)(ptr - pdata2);
         
         if (size2 > 7 && ptr[0] == 0xFF && (ptr[1] & 0xf0)  == 0xF0) // ADTS syncword 0xFFF
         {

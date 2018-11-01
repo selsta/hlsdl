@@ -1,3 +1,8 @@
 *.o
 hlsdl
 out
+msvc/x64
+msvc/Release_MT
+msvc/Release_MD
+msvc/Debug_MT
+msvc/Debug_MD

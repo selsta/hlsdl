@@ -1,12 +1,14 @@
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-#include <libavformat/avformat.h>
-#endif 
+#ifndef _MSC_VER
+#include <unistd.h>
+#else
+#include <Windows.h>
+#define sleep Sleep
+#endif
 
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <curl/curl.h>
 #include "curl.h"
 #include "hls.h"
@@ -42,7 +44,7 @@ static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_
 int main(int argc, char *argv[])
 {
     memset(&hls_args, 0x00, sizeof(hls_args));
-    hls_args.loglevel = 1;
+    hls_args.loglevel = 0;
     hls_args.segment_download_retries = HLSDL_MAX_RETRIES;
     hls_args.live_start_offset_sec = HLSDL_LIVE_START_OFFSET_SEC;
     hls_args.open_max_retries = HLSDL_OPEN_MAX_RETRIES;
@@ -56,9 +58,6 @@ int main(int argc, char *argv[])
     MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
 
     curl_global_init(CURL_GLOBAL_ALL);
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-    av_register_all();
-#endif
 
     char *hlsfile_source = NULL;
     hls_media_playlist_t media_playlist;

@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_MD|x64'">
+    <LocalDebuggerEnvironment>PATH=..\..\openssl-1.1.0f-vs2017\bin64;..\..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\bin;..\..\pthreads-w32-2-9-1-release\Pre-built.2\dll\x64;%PATH%
+$(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments></LocalDebuggerCommandArguments>
+  </PropertyGroup>
+</Project>

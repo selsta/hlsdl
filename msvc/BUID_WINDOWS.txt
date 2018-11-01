@@ -1,0 +1,75 @@
+######################################################################
+# Install utilities
+######################################################################
+git:
+https://git-scm.com/download/win
+
+Visual Studio 2017
+https://visualstudio.microsoft.com/pl/downloads/
+    community 
+        C++
+
+cmake:
+https://cmake.org/download/
+    cmake-3.13.0-rc2-win64-x64.msi
+
+######################################################################
+# Download & Build
+######################################################################
+
+# clonse hlsdl
+git clone https://github.com/samsamsam-iptvplayer/hlsdl.git
+
+# Download OpenSSL MSCVC
+https://www.npcglib.org/~stathis/blog/precompiled-openssl/
+
+# Download pthreads
+https://sourceware.org/pthreads-win32/
+ftp://sourceware.org/pub/pthreads-win32/pthreads-w32-2-9-1-release.zip
+
+# Build pthreads
+cd pthreads-w32-2-9-1-release\pthreads.2
+
+"c:\Program Files (x86)\Microsoft Visual Studio\2017\Community\\vc\Auxiliary\Build\vcvarsall.bat" x64
+
+set cl=/D_TIMESPEC_DEFINED
+
+nmake clean VC-static
+
+copy pthreadVC2.lib ..\Pre-built.2\lib\x64\pthreadVC2MT.lib
+
+nmake clean VC-static-debug
+
+copy pthreadVC2.lib ..\Pre-built.2\lib\x64\pthreadVC2MTd.lib
+
+
+# clone curl
+
+https://medium.com/@chuy.max/compile-libcurl-on-windows-with-visual-studio-2017-x64-and-ssl-winssl-cff41ac7971d
+
+git clone https://github.com/curl/curl.git
+
+cd curl
+
+git checkout tags/curl-7_62_0
+
+# build curl
+
+buildconf.bat
+
+"c:\Program Files (x86)\Microsoft Visual Studio\2017\Community\\vc\Auxiliary\Build\vcvarsall.bat" x64
+
+copy ..\hlsdl\vs2017\curl\MakefileBuild.vc winbuild\MakefileBuild.vc
+
+cd winbuild
+
+nmake /f Makefile.vc mode=dll WITH_SSL=dll SSL_PATH=../../openssl-1.1.0f-vs2017 DEBUG=yes MACHINE=x64
+
+nmake /f Makefile.vc mode=dll WITH_SSL=dll SSL_PATH=../../openssl-1.1.0f-vs2017 DEBUG=no MACHINE=x64
+
+nmake /f Makefile.vc mode=static WITH_SSL=static SSL_PATH=../../openssl-1.1.0f-vs2017 DEBUG=no MACHINE=x64
+
+..\builds\libcurl-vc-x64-release-dll-ipv6-sspi-winssl\bin\curl.exe --version
+
+# Open project solution hlsdl.sln
+

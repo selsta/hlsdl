@@ -10,7 +10,7 @@ int msg_print_va(int lvl, char *fmt, ...)
     va_list args;
     va_start(args, fmt);
     
-    if (hls_args.loglevel >= 0 || lvl == LVL_API) {
+    if (hls_args.loglevel >= 0 || (lvl == LVL_API && hls_args.loglevel >= -1)) {
         switch(lvl)
         {
             case LVL_API:
@@ -22,21 +22,21 @@ int msg_print_va(int lvl, char *fmt, ...)
             break;
             case LVL_WARNING:
                 fputs("Warning: ", stderr);
-                result = vfprintf(stdout, fmt, args);
+                result = vfprintf(stderr, fmt, args);
             break;
             case LVL_VERBOSE:
                 if (hls_args.loglevel > 0) {
-                    result = vfprintf(stdout, fmt, args);
+                    result = vfprintf(stderr, fmt, args);
                 }
             break;
             case LVL_DBG:
                 if (hls_args.loglevel > 1) {
-                    fputs("Debug: ", stdout);
-                    result = vfprintf(stdout, fmt, args);
+                    fputs("Debug: ", stderr);
+                    result = vfprintf(stderr, fmt, args);
                 }
             break;
             case LVL_PRINT:
-                result = vfprintf(stdout, fmt, args);
+                result = vfprintf(stderr, fmt, args);
             break;
             default:
                 break;

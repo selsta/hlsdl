@@ -36,28 +36,7 @@ struct hls_args {
     char *key_uri_replace_new;
 };
 
-static const uint8_t h264_nal_init[3] = {0x00, 0x00, 0x01};
-
-// start code emulation prevention table
-static const uint8_t h264_scep_search[4][4] =
-                  {{0x00, 0x00, 0x03, 0x00},
-                   {0x00, 0x00, 0x03, 0x01},
-                   {0x00, 0x00, 0x03, 0x02},
-                   {0x00, 0x00, 0x03, 0x03}};
-
-static const uint8_t h264_scep_replace[4][3] =
-                  {{0x00, 0x00, 0x00},
-                   {0x00, 0x00, 0x01},
-                   {0x00, 0x00, 0x02},
-                   {0x00, 0x00, 0x03}};
-
 struct hls_args hls_args;
-
-#if defined(WITH_FFMPEG) && WITH_FFMPEG
-int read_packet(void *opaque, uint8_t *buf, int buf_size);
-int64_t seek(void *opaque, int64_t offset, int whence);
-int bytes_remaining(const uint8_t *pos, const uint8_t *end);
-#endif
 
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);

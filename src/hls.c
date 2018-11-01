@@ -1,19 +1,21 @@
-
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#endif
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <assert.h>
 #include <pthread.h>
 #include <time.h>
 
+#ifndef _MSC_VER
 #include <sys/prctl.h>
+#include <unistd.h>
+#else
+#include <fcntl.h>
+#include <io.h>
+#include <sys/stat.h>
+#include <Windows.h>
+#define sleep Sleep
+#endif
 
 #include "curl.h"
 #include "hls.h"
@@ -21,6 +23,77 @@
 #include "misc.h"
 #include "aes.h"
 #include "mpegts.h"
+
+static bool is_file_exists(const char *filename)
+{
+#ifndef _MSC_VER
+    return access(filename, F_OK) != -1;
+#else
+    struct stat info;
+    int ret = -1;
+
+    ret = stat(filename, &info);
+    return 0 == ret;
+#endif
+}
+
+static FILE* get_output_file(void)
+{
+    FILE *pFile = NULL;
+
+    if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
+        // Set "stdout" to have binary mode:  
+        fflush(stdout);
+#ifndef _MSC_VER
+        pFile = freopen(NULL, "wb", stdout);
+#else
+        if (-1 != setmode(_fileno(stdout), _O_BINARY)) {
+            pFile = stdout;
+        }
+#endif
+        fflush(stdout);
+    } else {
+        char filename[MAX_FILENAME_LEN];
+        if (hls_args.filename) {
+            strcpy(filename, hls_args.filename);
+        }
+        else {
+            strcpy(filename, "000_hls_output.ts");
+        }
+
+        if (is_file_exists(filename)) {
+            if (hls_args.force_overwrite) {
+                if (remove(filename) != 0) {
+                    MSG_ERROR("Error overwriting file");
+                    exit(1);
+                }
+            }
+            else {
+                char userchoice = '\0';
+                MSG_PRINT("File already exists. Overwrite? (y/n) ");
+                if (scanf("\n%c", &userchoice) && userchoice == 'y') {
+                    if (remove(filename) != 0) {
+                        MSG_ERROR("Error overwriting file");
+                        exit(1);
+                    }
+                }
+                else {
+                    MSG_WARNING("Choose a different filename. Exiting.\n");
+                    exit(0);
+                }
+            }
+        }
+
+        pFile = fopen(filename, "wb");
+    }
+
+    if (pFile == NULL)
+    {
+        MSG_ERROR("Error can not open output file\n");
+        exit(1);
+    }
+    return pFile;
+}
 
 static uint64_t get_duration_ms(const char *ptr)
 {
@@ -540,222 +613,6 @@ finish:
     return 0;
 }
 
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-static int decrypt_sample_aes(struct hls_media_segment *s, struct ByteBuffer *buf)
-{
-    // SAMPLE AES works by encrypting small segments (blocks).
-    // Blocks have a size of 16 bytes.
-    // Only 1 in 10 blocks of the video stream are encrypted,
-    // while every single block of the audio stream is encrypted.
-    int audio_index = -1, video_index = -1;
-    static int audio_sample_rate = 0, audio_frame_size = 0;
-
-    struct ByteBuffer input_buffer = {buf->data, buf->len, 0};
-
-    AVInputFormat *ifmt = av_find_input_format("mpegts");
-    uint8_t *input_avbuff = av_malloc(4096);
-    AVIOContext *input_io_ctx = avio_alloc_context(input_avbuff, 4096, 0, &input_buffer,
-                                                   read_packet, NULL, seek);
-    AVFormatContext *ifmt_ctx = avformat_alloc_context();
-    ifmt_ctx->pb = input_io_ctx;
-
-    AVOutputFormat *ofmt = av_guess_format("mpegts", NULL, NULL);
-
-    AVFormatContext *ofmt_ctx = avformat_alloc_context();
-    ofmt_ctx->oformat = ofmt;
-    
-    if (avformat_open_input(&ifmt_ctx, "file.h264", ifmt, NULL) != 0) {
-        MSG_ERROR("Opening input file failed\n");
-    }
-
-    // avformat_find_stream_info() throws useless warnings because the data is encrypted.
-    av_log_set_level(AV_LOG_QUIET);
-    avformat_find_stream_info(ifmt_ctx, NULL);
-    av_log_set_level(AV_LOG_WARNING);
-
-    for (int i = 0; i < (int)ifmt_ctx->nb_streams; i++) {
-        AVCodecContext *in_c = ifmt_ctx->streams[i]->codec;
-        if (in_c->codec_type == AVMEDIA_TYPE_AUDIO) {
-            avformat_new_stream(ofmt_ctx, in_c->codec);
-            avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
-            audio_index = i;
-            if (s->sequence_number == 1) {
-                audio_frame_size = in_c->frame_size;
-                audio_sample_rate = in_c->sample_rate;
-            }
-        } else if (in_c->codec_id == AV_CODEC_ID_H264) {
-            avformat_new_stream(ofmt_ctx, in_c->codec);
-            avcodec_copy_context(ofmt_ctx->streams[i]->codec, in_c);
-            video_index = i;
-        }
-    }
-
-    if (video_index < 0 || audio_index < 0) {
-        MSG_ERROR("Video or Audio missing.");
-    }
-
-
-    // It can happen that only the first segment contains
-    // useful sample_rate/frame_size data.
-    if (ofmt_ctx->streams[audio_index]->codec->sample_rate == 0) {
-        ofmt_ctx->streams[audio_index]->codec->sample_rate = audio_sample_rate;
-    }
-    if (ofmt_ctx->streams[audio_index]->codec->frame_size == 0) {
-        ofmt_ctx->streams[audio_index]->codec->frame_size = audio_frame_size;
-    }
-
-    if (avio_open_dyn_buf(&ofmt_ctx->pb) != 0) {
-        MSG_ERROR("Could not open output memory stream.\n");
-    }
-
-    AVPacket pkt;
-    uint8_t packet_iv[16];
-
-    if (avformat_write_header(ofmt_ctx, NULL) != 0) {
-        MSG_ERROR("Writing header failed.\n");
-    }
-
-    while (av_read_frame(ifmt_ctx, &pkt) >= 0) {
-        if (pkt.stream_index == audio_index) {
-            // The IV must be reset at the beginning of every packet.
-            memcpy(packet_iv, s->enc_aes.iv_value, 16);
-
-            uint8_t *audio_frame = pkt.data;
-            uint8_t *p_frame = audio_frame;
-
-            enum AVCodecID cid = ifmt_ctx->streams[audio_index]->codec->codec_id;
-            if (cid == AV_CODEC_ID_AAC) {
-                // ADTS headers can contain CRC checks.
-                // If the CRC check bit is 0, CRC exists.
-                //
-                // Header (7 or 9 byte) + unencrypted leader (16 bytes)
-                p_frame += (p_frame[1] & 0x01) ? 23 : 25;
-            } else if (cid == AV_CODEC_ID_AC3) {
-                // AC3 Audio is untested. Sample streams welcome.
-                //
-                // unencrypted leader
-                p_frame += 16;
-            } else {
-                MSG_ERROR("This audio codec is unsupported.\n");
-                exit(1);
-            }
-
-            while (bytes_remaining(p_frame, (audio_frame + pkt.size)) >= 16 ) {
-                uint8_t *dec_tmp = malloc(16);
-                fill_key_value(&(s->enc_aes));
-                AES128_CBC_decrypt_buffer(dec_tmp, p_frame, 16, s->enc_aes.key_value, packet_iv);
-
-                // CBC requires the unencrypted data from the previous
-                // decryption as IV.
-                memcpy(packet_iv, p_frame, 16);
-
-                memcpy(p_frame, dec_tmp, 16);
-                free(dec_tmp);
-                p_frame += 16;
-            }
-            if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
-                MSG_WARNING("Writing audio frame failed.\n");
-            }
-        } else if (pkt.stream_index == video_index) {
-            // av_return_frame returns whole h264 frames. SAMPLE-AES
-            // encrypts NAL units instead of frames. Fortunatly, a frame
-            // contains multiple NAL units, so av_return_frame can be used.
-            uint8_t *h264_frame = pkt.data;
-            uint8_t *p = h264_frame;
-            uint8_t *end = p + pkt.size;
-            uint8_t *nal_end;
-
-            int block;
-
-            while (p < end) {
-                block = 0;
-                // Reset the IV at the beginning of every NAL unit.
-                memcpy(packet_iv, s->enc_aes.iv_value, 16);
-                p = memmem(p, (end - p), h264_nal_init, 3);
-                if (!p) {
-                    break;
-                }
-                nal_end = memmem(p + 3, (end - (p + 3)), h264_nal_init, 3);
-                if (!nal_end) {
-                    nal_end = end;
-                }
-
-                if (bytes_remaining(p, nal_end) <= (16 + 3 + 32)) {
-                    p = nal_end;
-                    continue;
-                } else {
-                    // Remove the start code emulation prevention
-                    for (int i = 0; i < 4; i++) {
-                        uint8_t *tmp = p;
-                        while ((tmp = memmem(tmp, nal_end - tmp, h264_scep_search[i], 4))) {
-                            memcpy(tmp, h264_scep_replace[i], 3);
-                            tmp += 3;
-                            end -= 1;
-                            memcpy(tmp, tmp + 1, (end - tmp));
-                        }
-                    }
-
-                    // NALinit bytes + NAL_unit_type_byte + unencrypted_leader
-                    p += 3 + 32;
-
-                    nal_end = memmem(p, (end - p), h264_nal_init, 3);
-                    if (!nal_end) {
-                        nal_end = end;
-                    }
-                }
-
-                while (bytes_remaining(p, nal_end) > 16) {
-                    block++;
-                    if (block == 1) {
-                        uint8_t *output = malloc(16);
-                        fill_key_value(&(s->enc_aes));
-                        AES128_CBC_decrypt_buffer(output, p, 16, s->enc_aes.key_value, packet_iv);
-
-                        // CBC requires the unencrypted data from the previous
-                        // decryption as IV.
-                        memcpy(packet_iv, p, 16);
-
-                        memcpy(p, output, 16);
-                        free (output);
-                    } else if (block == 10) {
-                        block = 0;
-                    }
-                    p += 16; //blocksize
-                }
-                p += bytes_remaining(p, nal_end); //unencryted trailer
-            }
-            pkt.size = bytes_remaining(pkt.data, end);
-            if (av_interleaved_write_frame(ofmt_ctx, &pkt)) {
-                MSG_WARNING("Writing video frame failed.\n");
-            }
-        }
-#if LIBAVCODEC_VERSION_MAJOR >= 56
-        av_packet_unref(&pkt);
-#else
-        av_free_packet(&pkt);
-#endif
-    }
-    if (av_write_trailer(ofmt_ctx) != 0) {
-        MSG_ERROR("Writing trailer failed.\n");
-    }
-
-    uint8_t *outbuf;
-    buf->len = avio_close_dyn_buf(ofmt_ctx->pb, &outbuf);
-    buf->data = realloc(buf->data, buf->len);
-    memcpy(buf->data, outbuf, buf->len);
-    av_free(outbuf);
-
-    av_free(input_io_ctx->buffer);
-    av_free(input_io_ctx);
-    input_avbuff = NULL;
-    avformat_free_context(ifmt_ctx);
-    avformat_free_context(ofmt_ctx);
-    return 0;
-}
-
-#else  // #if defined(WITH_FFMPEG) && WITH_FFMPEG 
-
-
 static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const uint8_t *pcr, uint16_t pid, uint8_t *cont_count)
 {
     uint8_t *av_data = in->data;
@@ -959,7 +816,7 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
         }
         nal_start = nal_end;
     }
-    return end - buf_in;
+    return (int)(end - buf_in);
 }
 
 static int sample_aes_decrypt_audio_data(hls_media_segment_t *s, uint8_t *ptr, uint32_t size, audiotype_t audio_codec)
@@ -1219,7 +1076,6 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
     
     return ret;
 }
-#endif
 
 static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
 {
@@ -1250,11 +1106,13 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
 
 static void *hls_playlist_update_thread(void *arg)
 {
+#ifndef _MSC_VER
     char threadname[50];
     strncpy(threadname, __func__, sizeof(threadname));
     threadname[49] = '\0';
     prctl(PR_SET_NAME, (unsigned long)&threadname);
-    
+#endif
+
     hls_playlist_updater_params *updater_params = arg;
     
     hls_media_playlist_t *me = updater_params->media_playlist;
@@ -1273,7 +1131,7 @@ static void *hls_playlist_update_thread(void *arg)
     //pthread_mutex_lock(media_playlist_mtx);
     is_endlist = me->is_endlist;
     if (hls_args.refresh_delay_sec < 0) {
-        refresh_delay_s = me->target_duration_ms / 1000;
+        refresh_delay_s = (int)(me->target_duration_ms / 1000);
         //pthread_mutex_unlock(media_playlist_mtx);
         
         if (refresh_delay_s > HLSDL_MAX_REFRESH_DELAY_SEC) {
@@ -1375,46 +1233,14 @@ static void *hls_playlist_update_thread(void *arg)
     
     clean_http_session(session);
     pthread_exit(NULL);
+    return NULL;
 }
 
 int download_live_hls(hls_media_playlist_t *me)
 {
     MSG_API("{\"d_t\":\"live\"}\n");
     
-    char filename[MAX_FILENAME_LEN];
-    if (hls_args.filename) {
-        strcpy(filename, hls_args.filename);
-    } else {
-        strcpy(filename, "000_hls_output.ts");
-    }
-
-    if (access(filename, F_OK) != -1) {
-        if (hls_args.force_overwrite) {
-            if (remove(filename) != 0) {
-                MSG_ERROR("Error overwriting file");
-                exit(1);
-            }
-        } else {
-            char userchoice = '\0';
-            MSG_PRINT("File already exists. Overwrite? (y/n) ");
-            if (scanf("\n%c", &userchoice) && userchoice == 'y') {
-                if (remove(filename) != 0) {
-                    MSG_ERROR("Error overwriting file");
-                    exit(1);
-                }
-            } else {
-                MSG_WARNING("Choose a different filename. Exiting.\n");
-                exit(0);
-            }
-        }
-    }
-
-    FILE *pFile = fopen(filename, "wb");
-    if (pFile == NULL)
-    {
-        MSG_ERROR("Error can not open output file\n");
-        exit(1);
-    }
+    FILE *pFile = get_output_file();
 
     hls_playlist_updater_params updater_params;
     
@@ -1649,40 +1475,7 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
     MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
     MSG_API("{\"t_d\":%u,\"d_d\":0, \"d_s\":0}\n", (uint32_t)(me->total_duration_ms / 1000)); // t_d - total duration, d_d  - download duration, d_s - download size
 
-    char filename[MAX_FILENAME_LEN];
-    if (hls_args.filename) {
-        strcpy(filename, hls_args.filename);
-    } else {
-        strcpy(filename, "000_hls_output.ts");
-    }
-
-    if (access(filename, F_OK) != -1) {
-        if (hls_args.force_overwrite) {
-            if (remove(filename) != 0) {
-                MSG_ERROR("Error overwriting file");
-                exit(1);
-            }
-        } else {
-            char userchoice = '\0';
-            MSG_PRINT("File already exists. Overwrite? (y/n) ");
-            if (scanf("\n%c", &userchoice) && userchoice == 'y') {
-                if (remove(filename) != 0) {
-                    MSG_ERROR("Error overwriting file");
-                    exit(1);
-                }
-            } else {
-                MSG_WARNING("Choose a different filename. Exiting.\n");
-                exit(0);
-            }
-        }
-    }
-
-    FILE *pFile = fopen(filename, "wb");
-    if (pFile == NULL)
-    {
-        MSG_ERROR("Error can not open output file\n");
-        exit(1);
-    }
+    FILE *pFile = get_output_file();
     
     int ret = 0;
     void *session = init_hls_session();

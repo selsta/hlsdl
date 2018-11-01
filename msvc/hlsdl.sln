@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2048
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hlsdl", "hlsdl.vcxproj", "{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_MD|x64 = Debug_MD|x64
+		Debug_MD|x86 = Debug_MD|x86
+		Release_MT|x64 = Release_MT|x64
+		Release_MT|x86 = Release_MT|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Debug_MD|x64.ActiveCfg = Debug_MD|x64
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Debug_MD|x64.Build.0 = Debug_MD|x64
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Debug_MD|x86.ActiveCfg = Debug_MD|Win32
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Debug_MD|x86.Build.0 = Debug_MD|Win32
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Release_MT|x64.ActiveCfg = Release_MT|x64
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Release_MT|x64.Build.0 = Release_MT|x64
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Release_MT|x86.ActiveCfg = Release_MT|Win32
+		{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}.Release_MT|x86.Build.0 = Release_MT|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C1B8CD3B-CC6D-4B61-931D-EB94FA610F56}
+	EndGlobalSection
+EndGlobal

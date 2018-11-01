@@ -1,20 +1,22 @@
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-#include <libavformat/avformat.h>
-#endif
-
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
 #include <stdarg.h>
+
+#ifndef _MSC_VER
 #include <unistd.h>
+#else
+#include <getopt.h>
+#endif
+
 #include "misc.h"
 #include "msg.h"
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.21\n");
+    printf("hlsdl v0.22\n");
     printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -47,10 +49,10 @@ int parse_argv(int argc, char * const argv[])
         switch (c) 
         {
         case 'v':
-            hls_args.loglevel++;
+            hls_args.loglevel += 1;
             break;
         case 'q':
-            hls_args.loglevel = -1;
+            hls_args.loglevel -= 1;
             break;
         case 'b':
             hls_args.use_best = 1;
@@ -117,57 +119,13 @@ int parse_argv(int argc, char * const argv[])
     return 1;
 }
 
-#if defined(WITH_FFMPEG) && WITH_FFMPEG 
-int read_packet(void *opaque, uint8_t *buf, int buf_size)
-{
-    struct ByteBuffer *bb = opaque;
-    int size = buf_size;
-
-    if (bb->len - bb->pos < buf_size) {
-        size = bb->len - bb->pos;
-    }
-
-    if (size > 0) {
-        memcpy(buf, bb->data + bb->pos, size);
-        bb->pos += size;
-    }
-    return size;
-}
-
-int64_t seek(void *opaque, int64_t offset, int whence)
-{
-    struct ByteBuffer *bb = opaque;
-
-    switch (whence) {
-        case SEEK_SET:
-            bb->pos = (int)offset;
-            break;
-        case SEEK_CUR:
-            bb->pos += offset;
-            break;
-        case SEEK_END:
-            bb->pos = (int)(bb->len - offset);
-            break;
-        case AVSEEK_SIZE:
-            return bb->len;
-            break;
-    }
-    return bb->pos;
-}
-
-int bytes_remaining(const uint8_t *pos, const uint8_t *end)
-{
-    return (int)(end - pos);
-}
-#endif
-
 int str_to_bin(uint8_t *data, char *hexstring, int len)
 {
     char *pos = hexstring;
 
     for (int count = 0; count < len; count++) {
         char buf[3] = {pos[0], pos[1], 0};
-        data[count] = strtol(buf, NULL, 16);
+        data[count] = (uint8_t)strtol(buf, NULL, 16);
         pos += 2;
     }
     return 0;
