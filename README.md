@@ -6,7 +6,7 @@ This program converts .m3u8 playlists to a .ts video. It supports decryption of 
 Requirements
 ------------
 
-This program does NOT require FFmpeg installed in order to decrypt SAMPLE-AES content.
+This program requires libcurl and libcrypto libraries.
 
 Build
 -----
