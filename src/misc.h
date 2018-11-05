@@ -2,6 +2,7 @@
 #define __HLS_DownLoad__misc__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define STRLEN_BTS(LEN) (((LEN) * 2) + 2)
 
@@ -17,11 +18,11 @@ typedef struct ByteBuffer {
 
 struct hls_args {
     int loglevel;
-    int use_best;
+    bool use_best;
     int skip_encryption;
-    int force_overwrite;
-    int dump_ts_urls;
-    int dump_dec_cmd;
+    bool force_overwrite;
+    bool dump_ts_urls;
+    bool dump_dec_cmd;
     int live_start_offset_sec;
     int refresh_delay_sec;
     int segment_download_retries;
@@ -34,6 +35,7 @@ struct hls_args {
     char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
     char *key_uri_replace_old;
     char *key_uri_replace_new;
+    bool accept_partial_content;
 };
 
 struct hls_args hls_args;

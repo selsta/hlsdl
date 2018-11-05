@@ -1340,7 +1340,7 @@ int download_live_hls(hls_media_playlist_t *me)
             size_t size = 0;
             long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, range);
             seg.len = (int)size;
-            if (http_code != 200 && (range == NULL || http_code != 206)) {
+            if (!(http_code == 200 || (http_code == 206 && (range != NULL || hls_args.accept_partial_content)))) {
                 int first_media_sequence = 0;
                 if (seg.data) {
                     free(seg.data);
@@ -1426,7 +1426,7 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
         size_t size = 0;
         long http_code = get_data_from_url_with_session(psession, ms->url, (char **)&(seg->data), &size, BINARY, NULL, range);
         seg->len = (int)size;
-        if (http_code != 200 && (range == NULL || http_code != 206)) {
+        if (!(http_code == 200 || (http_code == 206 && (range != NULL || hls_args.accept_partial_content)))) {
             if (seg->data) {
                 free(seg->data);
                 seg->data = NULL;

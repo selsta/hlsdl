@@ -737,11 +737,12 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                     }
                 }
             }
+
             for(uint32_t k=0; k<max2 && j < count2; ++k, ++j)
             {
                 if (raw_audio_get_next_frame(&data_ptr, end_ptr, &frame_length))
                 {
-                   // we got ADTS frame here
+                   // we got audio frame here
                    // add PES header, split to TS packets and add headers with addation field
                    uint8_t pes_header[PES_HEADER_WITH_PTS_SIZE];
                    int32_t pes_header_length = InsertPesHeader(pes_header, frame_length, stream_id, dts, 0);
@@ -755,11 +756,37 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                        cont_count = (cont_count + 1) % 16;
 
                        // write first packet with PES header
+                       
+                       // check if check if alignment is needed
+                       uint8_t available_size = TS_PACKET_LENGTH - 4 - pes_header_length;
+                       if (available_size > left_payload_size) {
+                            towrite = left_payload_size;
+                            ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add alignment
+                       } else {
+                            ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
+                            towrite = available_size;
+                       }
                        if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
-                       if (fwrite(pes_header, pes_header_length, 1, context->out)) ret += pes_header_length;
-                       towrite = TS_PACKET_LENGTH - 4 - pes_header_length;
-                       towrite = towrite >  left_payload_size ? left_payload_size : towrite;
 
+                       if (available_size > left_payload_size) {
+                            uint8_t s;
+                            uint8_t aflen = available_size - left_payload_size - 1;
+                            uint8_t pattern = 0xff;
+                            if (fwrite(&aflen, 1, 1, context->out)) ret += 1; // addaptation filed size without field size
+                            if (aflen > 0)
+                            {
+                                pattern = 0x00;
+                                if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                pattern = 0xff;
+                            }
+
+                            for(s=1; s < aflen; ++s)
+                            {
+                                if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                            }
+                       }
+
+                       if (fwrite(pes_header, pes_header_length, 1, context->out)) ret += pes_header_length;
                        if (fwrite(data_ptr, towrite, 1, context->out)) ret += towrite;
                        left_payload_size -= towrite;
                        data_ptr += towrite;
@@ -769,6 +796,7 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                            uint32_t packets_num = left_payload_size / (TS_PACKET_LENGTH - 4);
                            uint32_t p;
                            ts_header[1] &= 0xBF; // unset payload_unit_start_indicator
+                           ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
                            for (p=0; p < packets_num; ++p)
                            {
                                ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
@@ -789,7 +817,7 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                                cont_count = (cont_count + 1) % 16;
                                if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
                                ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
-                               if (fwrite(&aflen, 1, 1, context->out)) ret += 1;
+                               if (fwrite(&aflen, 1, 1, context->out)) ret += 1; // addaptation filed size without field size
                                if (aflen > 0)
                                {
                                     pattern = 0x00;

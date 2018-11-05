@@ -16,7 +16,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.22\n");
+    printf("hlsdl v0.23\n");
     printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -35,7 +35,8 @@ static void print_help(const char *filename)
            "-e ... Set refresh delay in seconds.\n"
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
-           "-a ... Set additional url to the audio media playlist.\n", filename);
+           "-a ... Set additional url to the audio media playlist.\n"
+           "-c ... Threat HTTP code 206 as 200 even if request was made without range header.\n", filename);
     exit(0);
 }
 
@@ -44,7 +45,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbftdo:u:h:s:r:w:e:p:k:n:a:")) != -1) 
+    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:")) != -1) 
     {
         switch (c) 
         {
@@ -55,7 +56,7 @@ int parse_argv(int argc, char * const argv[])
             hls_args.loglevel -= 1;
             break;
         case 'b':
-            hls_args.use_best = 1;
+            hls_args.use_best = true;
             break;
         case 'h':
             if (custom_header_idx < HLSDL_MAX_NUM_OF_CUSTOM_HEADERS) {
@@ -64,7 +65,7 @@ int parse_argv(int argc, char * const argv[])
             }
             break;
         case 'f':
-            hls_args.force_overwrite = 1;
+            hls_args.force_overwrite = true;
             break;
         case 's':
             hls_args.live_start_offset_sec = atoi(optarg);
@@ -82,10 +83,10 @@ int parse_argv(int argc, char * const argv[])
             hls_args.filename = optarg;
             break;
         case 't':
-            hls_args.dump_ts_urls = 1;
+            hls_args.dump_ts_urls = true;
             break;
         case 'd':
-            hls_args.dump_dec_cmd = 1;
+            hls_args.dump_dec_cmd = true;
             break;
         case 'u':
             hls_args.user_agent = optarg;
@@ -101,6 +102,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'a':
             hls_args.audio_url = optarg;
+            break;
+        case 'c':
+            hls_args.accept_partial_content = true;
             break;
         default:
             MSG_ERROR("?? getopt returned character code 0%o ??\n", c);
