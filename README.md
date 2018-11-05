@@ -1,17 +1,21 @@
 hlsdl
 ==============
 
-This program converts .m3u8 playlists to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
+This program converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
 
 Requirements
 ------------
 
-This program does NOT require FFmpeg installed in order to decrypt SAMPLE-AES content.
+This program requires libcurl and libcrypto libraries.
 
 Build
 -----
+Linux:
+`make && make install && make clean`
 
-Use `make && make install && make clean` to install.
+Windows:
+https://github.com/samsamsam-iptvplayer/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
+
 
 Usage and Options
 -------
@@ -23,7 +27,7 @@ Usage and Options
 
 -v ... Verbose more information.
 
--o ... Choose name of output file.
+-o ... Choose name of output file ("-" alias for stdout).
 
 -u ... Set custom HTTP User-Agent header.
 
@@ -54,4 +58,8 @@ Usage and Options
 -a ... Set additional url to the audio media playlist.
 ```
 
+ToDo
+-----
+* support for Fragmented MPEG-4 playlist
+* support for EXT-X-MAP in the MPEG-2 Transport Streams playlist
 
