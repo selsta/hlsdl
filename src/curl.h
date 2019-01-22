@@ -1,6 +1,10 @@
 #ifndef __HLS_DownLoad__curl__
 #define __HLS_DownLoad__curl__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 #define STRING 0x0001
@@ -20,5 +24,9 @@ long get_data_from_url_with_session(void **session, char *url, char **out, size_
 void clean_http_session(void *session);
 size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **new_url);
 void set_fresh_connect_http_session(void *ptr_session, long val);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* defined(__HLS_DownLoad__curl__) */

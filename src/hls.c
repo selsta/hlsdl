@@ -7,7 +7,9 @@
 #include <time.h>
 
 #ifndef _MSC_VER
+#ifndef __APPLE__
 #include <sys/prctl.h>
+#endif
 #include <unistd.h>
 #else
 #include <fcntl.h>
@@ -1110,7 +1112,9 @@ static void *hls_playlist_update_thread(void *arg)
     char threadname[50];
     strncpy(threadname, __func__, sizeof(threadname));
     threadname[49] = '\0';
+#ifndef __APPLE__
     prctl(PR_SET_NAME, (unsigned long)&threadname);
+#endif
 #endif
 
     hls_playlist_updater_params *updater_params = arg;

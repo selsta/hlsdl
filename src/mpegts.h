@@ -1,6 +1,10 @@
 #ifndef __HLS_DownLoad__mpegts__
 #define __HLS_DownLoad__mpegts__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -91,5 +95,9 @@ void pmt_update_crc(pmt_data_t *pmt);
 bool adts_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
 bool ac3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
 bool ec3_get_next_frame(const uint8_t **data_ptr, const uint8_t *end_ptr, uint32_t *frame_length);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* defined(__HLS_DownLoad__mpegts__) */
