@@ -1,6 +1,10 @@
 #ifndef __HLS_DownLoad__hls__
 #define __HLS_DownLoad__hls__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -98,5 +102,9 @@ void add_media_segment(hls_media_playlist_t *me);
 int fill_key_value(struct enc_aes128 *es);
 
 long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* defined(__HLS_DownLoad__hls__) */

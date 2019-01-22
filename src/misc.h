@@ -1,6 +1,10 @@
 #ifndef __HLS_DownLoad__misc__
 #define __HLS_DownLoad__misc__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -44,5 +48,9 @@ int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);
 
 char *repl_str(const char *str, const char *from, const char *to);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* defined(__HLS_DownLoad__misc__) */
