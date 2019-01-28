@@ -5,6 +5,12 @@
 #define sleep Sleep
 #endif
 
+#if defined(__MINGW32__) || defined(_MSC_VER)
+#include <fcntl.h>
+#include <io.h>
+#include <sys/stat.h>
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -14,6 +20,81 @@
 #include "hls.h"
 #include "msg.h"
 #include "misc.h"
+
+static size_t priv_write(const void *ptr, size_t size, size_t n, void *opaque) {
+    return fwrite(ptr, size, n, opaque);
+}
+
+static bool is_file_exists(const char *filename)
+{
+#ifndef _MSC_VER
+    return access(filename, F_OK) != -1;
+#else
+    struct stat info;
+    int ret = -1;
+
+    ret = stat(filename, &info);
+    return 0 == ret;
+#endif
+}
+
+static FILE* get_output_file(void)
+{
+    FILE *pFile = NULL;
+
+    if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
+        // Set "stdout" to have binary mode:  
+        fflush(stdout);
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+        pFile = freopen(NULL, "wb", stdout);
+#else
+        if (-1 != setmode(_fileno(stdout), _O_BINARY)) {
+            pFile = stdout;
+        }
+#endif
+        fflush(stdout);
+    } else {
+        char filename[MAX_FILENAME_LEN];
+        if (hls_args.filename) {
+            strcpy(filename, hls_args.filename);
+        }
+        else {
+            strcpy(filename, "000_hls_output.ts");
+        }
+
+        if (is_file_exists(filename)) {
+            if (hls_args.force_overwrite) {
+                if (remove(filename) != 0) {
+                    MSG_ERROR("Error overwriting file");
+                    exit(1);
+                }
+            }
+            else {
+                char userchoice = '\0';
+                MSG_PRINT("File already exists. Overwrite? (y/n) ");
+                if (scanf("\n%c", &userchoice) && userchoice == 'y') {
+                    if (remove(filename) != 0) {
+                        MSG_ERROR("Error overwriting file");
+                        exit(1);
+                    }
+                }
+                else {
+                    MSG_WARNING("Choose a different filename. Exiting.\n");
+                    exit(0);
+                }
+            }
+        }
+
+        pFile = fopen(filename, "wb");
+    }
+
+    if (pFile == NULL)
+    {
+        MSG_ERROR("Error can not open output file\n");
+        exit(1);
+    }
+    return pFile;
+}
 
 static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_url, int tries)
 {
@@ -269,16 +350,21 @@ int main(int argc, char *argv[])
         if (print_enc_keys(&media_playlist)) {
             return 1;
         }
-    } else if (media_playlist.is_endlist) {
-        if (download_hls(&media_playlist, &audio_media_playlist)) {
-            return 1;
+    } else {
+        int ret = -1;
+        FILE *out_file = get_output_file();
+        if (out_file) {
+            write_ctx_t out_ctx = {priv_write, out_file};
+            if (media_playlist.is_endlist) {
+                ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist);
+            } else {
+                ret = download_live_hls(&out_ctx, &media_playlist);
+            }
+            fclose(out_file);
         }
-    } else if (!media_playlist.is_endlist) {
-        if (download_live_hls(&media_playlist)) {
-            return 1;
-        }
+        return ret ? 1 : 0;
     }
-    
+
     free(url);
     media_playlist_cleanup(&media_playlist);
     curl_global_cleanup();

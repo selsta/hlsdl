@@ -729,10 +729,10 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                 {
                     uint16_t pid = ((pdata1[1] & 0x1f) << 8) | pdata1[2]; // PID - 13b
                     if (pid != context->pmt1.pid) {
-                        if (fwrite(pdata1, TS_PACKET_LENGTH, 1, context->out)) ret += TS_PACKET_LENGTH;
+                        if (context->out->write(pdata1, TS_PACKET_LENGTH, 1, context->out->opaque)) ret += TS_PACKET_LENGTH;
                         if (TID_PAT == pid)
                         {
-                            if (fwrite(context->pmt.data, TS_PACKET_LENGTH, 1, context->out)) ret += TS_PACKET_LENGTH;
+                            if (context->out->write(context->pmt.data, TS_PACKET_LENGTH, 1, context->out->opaque)) ret += TS_PACKET_LENGTH;
                         }
                     }
                 }
@@ -766,28 +766,28 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                             ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
                             towrite = available_size;
                        }
-                       if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
+                       if (context->out->write(ts_header, 4, 1, context->out->opaque)) ret += 4;
 
                        if (available_size > left_payload_size) {
                             uint8_t s;
                             uint8_t aflen = available_size - left_payload_size - 1;
                             uint8_t pattern = 0xff;
-                            if (fwrite(&aflen, 1, 1, context->out)) ret += 1; // addaptation filed size without field size
+                            if (context->out->write(&aflen, 1, 1, context->out->opaque)) ret += 1; // addaptation filed size without field size
                             if (aflen > 0)
                             {
                                 pattern = 0x00;
-                                if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                if (context->out->write(&pattern, 1, 1, context->out->opaque)) ret += 1;
                                 pattern = 0xff;
                             }
 
                             for(s=1; s < aflen; ++s)
                             {
-                                if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                if (context->out->write(&pattern, 1, 1, context->out->opaque)) ret += 1;
                             }
                        }
 
-                       if (fwrite(pes_header, pes_header_length, 1, context->out)) ret += pes_header_length;
-                       if (fwrite(data_ptr, towrite, 1, context->out)) ret += towrite;
+                       if (context->out->write(pes_header, pes_header_length, 1, context->out->opaque)) ret += pes_header_length;
+                       if (context->out->write(data_ptr, towrite, 1, context->out->opaque)) ret += towrite;
                        left_payload_size -= towrite;
                        data_ptr += towrite;
 
@@ -801,8 +801,8 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                            {
                                ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
                                cont_count = (cont_count + 1) % 16;
-                               if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
-                               if (fwrite(data_ptr, TS_PACKET_LENGTH - 4, 1, context->out)) ret += TS_PACKET_LENGTH - 4;
+                               if (context->out->write(ts_header, 4, 1, context->out->opaque)) ret += 4;
+                               if (context->out->write(data_ptr, TS_PACKET_LENGTH - 4, 1, context->out->opaque)) ret += TS_PACKET_LENGTH - 4;
                                data_ptr += (TS_PACKET_LENGTH - 4);
                            }
                            left_payload_size -= (TS_PACKET_LENGTH - 4) * packets_num;
@@ -815,21 +815,21 @@ static size_t do_merge_with_raw_audio(merge_context_t *context, const uint8_t *p
                                ts_header[3] = (ts_header[3] & 0xcf) | 0x30; // set addaptation filed flag to add alignment
                                ts_header[3] = (ts_header[3] & 0xf0) | cont_count;
                                cont_count = (cont_count + 1) % 16;
-                               if (fwrite(ts_header, 4, 1, context->out)) ret += 4;
+                               if (context->out->write(ts_header, 4, 1, context->out->opaque)) ret += 4;
                                ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
-                               if (fwrite(&aflen, 1, 1, context->out)) ret += 1; // addaptation filed size without field size
+                               if (context->out->write(&aflen, 1, 1, context->out->opaque)) ret += 1; // addaptation filed size without field size
                                if (aflen > 0)
                                {
                                     pattern = 0x00;
-                                    if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                    if (context->out->write(&pattern, 1, 1, context->out->opaque)) ret += 1;
                                     pattern = 0xff;
                                }
 
                                for(s=1; s < aflen; ++s)
                                {
-                                    if (fwrite(&pattern, 1, 1, context->out)) ret += 1;
+                                    if (context->out->write(&pattern, 1, 1, context->out->opaque)) ret += 1;
                                }
-                               if (fwrite(data_ptr, left_payload_size, 1, context->out)) ret += left_payload_size;
+                               if (context->out->write(data_ptr, left_payload_size, 1, context->out->opaque)) ret += left_payload_size;
                                
                                data_ptr += left_payload_size;
                            }
@@ -943,7 +943,7 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                         uint16_t pid = ((pdata1[1] & 0x1f) << 8) | pdata1[2]; // PID - 13b
                         if (pid != context->pmt1.pid)
                         {
-                            if (fwrite(pdata1, TS_PACKET_LENGTH, 1, context->out))
+                            if (context->out->write(pdata1, TS_PACKET_LENGTH, 1, context->out->opaque))
                             {
                                 ret += TS_PACKET_LENGTH;
                             }
@@ -951,7 +951,7 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                             if (TID_PAT == pid && write_pmt)
                             {
                                 write_pmt = false;
-                                if (fwrite(context->pmt.data, TS_PACKET_LENGTH, 1, context->out))
+                                if (context->out->write(context->pmt.data, TS_PACKET_LENGTH, 1, context->out->opaque))
                                 {
                                     ret += TS_PACKET_LENGTH;
                                 }
@@ -968,16 +968,16 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                         // if (TID_PAT != pid && pid != context->pmt2.pid)
                         if (pid == context->pmt2.components[0].elementary_PID)
                         {
-                            if (fwrite(pdata2, 1, 1, context->out)) ret += 1;
+                            if (context->out->write(pdata2, 1, 1, context->out->opaque)) ret += 1;
 
                             // we need to update PID
                             pid = context->pmt.components[context->pmt.component_num-1].elementary_PID;
                             uint8_t tmp[2];
                             tmp[0] = (pdata2[1] & 0xE0) | (pid >> 8);
                             tmp[1] = pid & 0xFF;
-                            if (fwrite(tmp, 2, 1, context->out)) ret += 2;
+                            if (context->out->write(tmp, 2, 1, context->out->opaque)) ret += 2;
 
-                            if (fwrite(pdata2+3, TS_PACKET_LENGTH-3, 1, context->out)) ret += TS_PACKET_LENGTH-3;
+                            if (context->out->write(pdata2+3, TS_PACKET_LENGTH-3, 1, context->out->opaque)) ret += TS_PACKET_LENGTH-3;
                         }
                     }
                 }

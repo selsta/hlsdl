@@ -8,6 +8,8 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "misc.h"
+
 #define MASTER_PLAYLIST 0
 #define MEDIA_PLAYLIST 1
 
@@ -91,8 +93,8 @@ typedef struct hls_playlist_updater_params {
 int get_playlist_type(char *source);
 int handle_hls_master_playlist(struct hls_master_playlist *ma);
 int handle_hls_media_playlist(hls_media_playlist_t *me);
-int download_live_hls(hls_media_playlist_t *me);
-int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
+int download_live_hls(write_ctx_t *ctx, hls_media_playlist_t *me);
+int download_hls(write_ctx_t *ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
 int print_enc_keys(hls_media_playlist_t *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(hls_media_playlist_t *me);

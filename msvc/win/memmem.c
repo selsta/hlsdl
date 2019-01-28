@@ -31,6 +31,8 @@
  * http://www-igm.univ-mlv.fr/~lecroq/string/
  */
 #include <string.h>
+void *memmem(const void *haystack, size_t n, const void *needle, size_t m);
+
 void *memmem(const void *haystack, size_t n, const void *needle, size_t m)
 {
     if (m > n || !m || !n)

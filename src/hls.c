@@ -7,17 +7,16 @@
 #include <time.h>
 
 #ifndef _MSC_VER
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__MINGW32__)
 #include <sys/prctl.h>
 #endif
 #include <unistd.h>
 #else
-#include <fcntl.h>
-#include <io.h>
-#include <sys/stat.h>
 #include <Windows.h>
 #define sleep Sleep
 #endif
+
+#include <inttypes.h>
 
 #include "curl.h"
 #include "hls.h"
@@ -25,77 +24,6 @@
 #include "misc.h"
 #include "aes.h"
 #include "mpegts.h"
-
-static bool is_file_exists(const char *filename)
-{
-#ifndef _MSC_VER
-    return access(filename, F_OK) != -1;
-#else
-    struct stat info;
-    int ret = -1;
-
-    ret = stat(filename, &info);
-    return 0 == ret;
-#endif
-}
-
-static FILE* get_output_file(void)
-{
-    FILE *pFile = NULL;
-
-    if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
-        // Set "stdout" to have binary mode:  
-        fflush(stdout);
-#ifndef _MSC_VER
-        pFile = freopen(NULL, "wb", stdout);
-#else
-        if (-1 != setmode(_fileno(stdout), _O_BINARY)) {
-            pFile = stdout;
-        }
-#endif
-        fflush(stdout);
-    } else {
-        char filename[MAX_FILENAME_LEN];
-        if (hls_args.filename) {
-            strcpy(filename, hls_args.filename);
-        }
-        else {
-            strcpy(filename, "000_hls_output.ts");
-        }
-
-        if (is_file_exists(filename)) {
-            if (hls_args.force_overwrite) {
-                if (remove(filename) != 0) {
-                    MSG_ERROR("Error overwriting file");
-                    exit(1);
-                }
-            }
-            else {
-                char userchoice = '\0';
-                MSG_PRINT("File already exists. Overwrite? (y/n) ");
-                if (scanf("\n%c", &userchoice) && userchoice == 'y') {
-                    if (remove(filename) != 0) {
-                        MSG_ERROR("Error overwriting file");
-                        exit(1);
-                    }
-                }
-                else {
-                    MSG_WARNING("Choose a different filename. Exiting.\n");
-                    exit(0);
-                }
-            }
-        }
-
-        pFile = fopen(filename, "wb");
-    }
-
-    if (pFile == NULL)
-    {
-        MSG_ERROR("Error can not open output file\n");
-        exit(1);
-    }
-    return pFile;
-}
 
 static uint64_t get_duration_ms(const char *ptr)
 {
@@ -1112,7 +1040,7 @@ static void *hls_playlist_update_thread(void *arg)
     char threadname[50];
     strncpy(threadname, __func__, sizeof(threadname));
     threadname[49] = '\0';
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__MINGW32__)
     prctl(PR_SET_NAME, (unsigned long)&threadname);
 #endif
 #endif
@@ -1240,11 +1168,9 @@ static void *hls_playlist_update_thread(void *arg)
     return NULL;
 }
 
-int download_live_hls(hls_media_playlist_t *me)
+int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
 {
     MSG_API("{\"d_t\":\"live\"}\n");
-    
-    FILE *pFile = get_output_file();
 
     hls_playlist_updater_params updater_params;
     
@@ -1335,7 +1261,7 @@ int download_live_hls(hls_media_playlist_t *me)
         int retries = 0;
         char *range = NULL;
         if (ms->size > -1) {
-            snprintf(range_buff, sizeof(range_buff), "%lld-%lld", ms->offset, ms->offset + ms->size - 1);
+            snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, ms->offset, ms->offset + ms->size - 1);
             range = range_buff;
         }
         do {
@@ -1381,14 +1307,14 @@ int download_live_hls(hls_media_playlist_t *me)
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
                 decrypt_sample_aes(ms, &seg);
             }
-            download_size += fwrite(seg.data, 1, seg.len, pFile);
+            download_size += out_ctx->write(seg.data, 1, seg.len, out_ctx->opaque);
             free(seg.data);
             
             set_fresh_connect_http_session(session, 0);
             
             time_t curRepTime = time(NULL);
             if ((curRepTime - repTime) >= 1) {
-                MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%lld}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+                MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
                 repTime = curRepTime;
             }
             
@@ -1404,12 +1330,12 @@ int download_live_hls(hls_media_playlist_t *me)
     pthread_cond_destroy(&media_playlist_refresh_cond);
     pthread_cond_destroy(&media_playlist_empty_cond);
     
-    MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%lld}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+    MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
     if (session)
     {
         clean_http_session(session);
     }
-    fclose(pFile);
+
     return 0;
 }
 
@@ -1422,7 +1348,7 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         char *range = NULL;
         if (ms->size > -1) {
-            snprintf(range_buff, sizeof(range_buff), "%lld-%lld", ms->offset, ms->offset + ms->size - 1);
+            snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, ms->offset, ms->offset + ms->size - 1);
             range = range_buff;
         }
 
@@ -1473,14 +1399,12 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
     return ret;
 }
 
-int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
+int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
 {
     MSG_VERBOSE("Downloading segments.\n");
     MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
     MSG_API("{\"t_d\":%u,\"d_d\":0, \"d_s\":0}\n", (uint32_t)(me->total_duration_ms / 1000)); // t_d - total duration, d_d  - download duration, d_s - download size
 
-    FILE *pFile = get_output_file();
-    
     int ret = 0;
     void *session = init_hls_session();
     set_timeout_session(session, 2L, 3L);
@@ -1499,7 +1423,7 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
     if (me_audio) {
         ms_audio = me_audio->first_media_segment;
         memset(&merge_context, 0x00, sizeof(merge_context));
-        merge_context.out = pFile;
+        merge_context.out = out_ctx;
     }
 
     while(ms) {
@@ -1518,7 +1442,7 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
             free(seg_audio.data);
             ms_audio = ms_audio->next;
         } else {
-            download_size += fwrite(seg.data, 1, seg.len, pFile);
+            download_size += out_ctx->write(seg.data, 1, seg.len, out_ctx->opaque);
         }
 
         free(seg.data);
@@ -1527,19 +1451,19 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
 
         time_t curRepTime = time(NULL);
         if ((curRepTime - repTime) >= 1) {
-            MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%lld}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+            MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
             repTime = curRepTime;
         }
 
         ms = ms->next;
     }
     
-    MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%lld}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+    MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
     
     if (session) {
         clean_http_session(session);
     }
-    fclose(pFile);
+
     return ret;
 }
 

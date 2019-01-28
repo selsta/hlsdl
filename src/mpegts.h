@@ -8,6 +8,8 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "misc.h"
+
 #define TID_PAT                       0x00
 #define TID_CAT                       0x01
 #define TID_PMT                       0x02
@@ -84,7 +86,7 @@ typedef struct merge_context_s {
     pmt_data_t pmt1;
     pmt_data_t pmt2;
     bool valid;
-    FILE *out;
+    write_ctx_t *out;
 } merge_context_t;
 
 bool parse_ts_packet(const uint8_t *data, ts_packet_t *packed);

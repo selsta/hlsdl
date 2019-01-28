@@ -14,6 +14,11 @@ extern "C" {
 #define MAX_URL_LEN 2048
 #define HLSDL_MAX_NUM_OF_CUSTOM_HEADERS 256
 
+typedef struct write_ctx {
+    size_t (*write) ( const void * ptr, size_t size, size_t count, void *opaque);
+    void *opaque;
+} write_ctx_t;
+
 typedef struct ByteBuffer {
     uint8_t *data;
     int len;
