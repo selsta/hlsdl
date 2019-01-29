@@ -17,7 +17,7 @@
 static void print_help(const char *filename)
 {
     printf("hlsdl v0.24\n");
-    printf("(c) 2017-2018 samsamsam@o2.pl based on @selsta code\n");
+    printf("(c) 2017-2019 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
            "-v ... Verbose more information.\n"
@@ -25,8 +25,8 @@ static void print_help(const char *filename)
            "-u ... Set custom HTTP User-Agent header.\n"
            "-h ... Set custom HTTP header.\n"
            "-p ... Set proxy uri.\n"
-           "-k ... Allow to replace part of AES key uri - old."
-           "-n ... Allow to replace part of AES key uri - new."
+           "-k ... Allow to replace part of AES key uri - old.\n"
+           "-n ... Allow to replace part of AES key uri - new.\n"
            "-f ... Force overwriting the output file.\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
@@ -36,7 +36,7 @@ static void print_help(const char *filename)
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
            "-a ... Set additional url to the audio media playlist.\n"
-           "-c ... Threat HTTP code 206 as 200 even if request was made without range header.\n", filename);
+           "-c ... Treat HTTP code 206 as 200 even if request was made without range header.\n", filename);
     exit(0);
 }
 

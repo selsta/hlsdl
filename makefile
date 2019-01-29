@@ -12,7 +12,7 @@ ifeq ("$(OSNAME)", "darwin")
 else ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
 else ifeq ("$(OSNAME)", "mingw32")
-	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
+	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99 -DCURL_STATICLIB
 	S_SRC+=msvc/win/memmem.c
 else
 endif
