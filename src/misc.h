@@ -15,7 +15,7 @@ extern "C" {
 #define HLSDL_MAX_NUM_OF_CUSTOM_HEADERS 256
 
 typedef struct write_ctx {
-    size_t (*write) ( const void * ptr, size_t size, size_t count, void *opaque);
+    size_t (*write) ( const uint8_t *data, size_t len, void *opaque);
     void *opaque;
 } write_ctx_t;
 

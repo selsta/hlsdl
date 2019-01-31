@@ -52,14 +52,14 @@ static uint64_t get_duration_ms(const char *ptr)
         else
             break;
         ++ptr;
-    }  
-    
+    }
+
     if (v2 > 0)
     while (n < 3) {
         ++n;
         v2 *= 10;
     }
-    
+
     return v1 * 1000 + v2;
 }
 
@@ -68,11 +68,11 @@ static void set_hls_http_header(void *session)
     if (hls_args.user_agent) {
         set_user_agent_http_session(session, hls_args.user_agent);
     }
-    
+
     if (hls_args.proxy_uri) {
         set_proxy_uri_http_session(session, hls_args.proxy_uri);
     }
-    
+
     for (int i=0; i<HLSDL_MAX_NUM_OF_CUSTOM_HEADERS; ++i) {
         if (hls_args.custom_headers[i]) {
             add_custom_header_http_session(session, hls_args.custom_headers[i]);
@@ -152,7 +152,7 @@ static int extend_url(char **url, const char *baseurl)
         free(domain);
         return 0;
     }
-    
+
     else {
         // URLs can have '?'. To make /../ work, remove it.
         char *domain = strdup(baseurl);
@@ -207,7 +207,7 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
     me->encryption = true;
     me->encryptiontype = enc_type;
     me->enc_aes.iv_is_static = false;
-        
+
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
     char sep = '\0';
@@ -222,9 +222,9 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
             me->enc_aes.iv_is_static = true;
             free(iv_bin);
         }
-        
+
         extend_url(&link_to_key, me->url);
-        
+
         free(me->enc_aes.key_url);
         me->enc_aes.key_url = strdup(link_to_key);
     }
@@ -239,9 +239,9 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
     char *src = me->source;
     int64_t seg_offset = 0;
     int64_t seg_size = -1;
-    
+
     MSG_PRINT("> START media_playlist_get_links\n");
-    
+
     int i = 0;
     while(src != NULL){
         if (ms == NULL)
@@ -249,7 +249,7 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
             ms = malloc(sizeof(struct hls_media_segment));
             memset(ms, 0x00, sizeof(struct hls_media_segment));
         }
-        
+
         while ((src = (strchr(src, '\n')))) {
             src++;
             if (*src == '\n') {
@@ -265,7 +265,7 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
             if (*src == '\0') {
                 goto finish;
             }
-            
+
             char *end_ptr = strchr(src, '\n');
             if (end_ptr != NULL) {
                 int url_size = (int)(end_ptr - src) + 1;
@@ -286,10 +286,10 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                         free(iv_bin);
                     }
                 }
-                
+
                 /* Get full url */
                 extend_url(&(ms->url), me->url);
-                
+
                 ms->size = seg_size;
                 if (seg_size >= 0) {
                     ms->offset = seg_offset;
@@ -299,7 +299,7 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                     ms->offset = 0;
                     seg_offset = 0;
                 }
-                
+
                 /* Add new segment to segment list */
                 if (me->first_media_segment == NULL)
                 {
@@ -325,11 +325,11 @@ finish:
     if (i > 0) {
         me->last_media_sequence = me->first_media_sequence + i - 1;
     }
-    
+
     media_segment_cleanup(ms);
-    
+
     MSG_PRINT("> END media_playlist_get_links\n");
-    
+
     return 0;
 }
 
@@ -348,12 +348,12 @@ int handle_hls_media_playlist(hls_media_playlist_t *me)
 {
     me->encryption = false;
     me->encryptiontype = ENC_NONE;
-    
+
     if (!me->source) {
         size_t size = 0;
         long http_code = 0;
         int tries = hls_args.open_max_retries;
-            
+
         while (tries) {
             http_code = get_hls_data_from_url(me->orig_url, &me->source, &size, STRING, &me->url);
             if (200 != http_code || size == 0) {
@@ -365,7 +365,7 @@ int handle_hls_media_playlist(hls_media_playlist_t *me)
             break;
         }
     }
-    
+
     me->first_media_segment = NULL;
     me->last_media_segment = NULL;
     me->target_duration_ms = 0;
@@ -424,7 +424,7 @@ static bool get_next_attrib(char **source, char **tag, char **val)
     } else {
         *source = ptr;
     }
-    
+
     return ret;
 }
 
@@ -500,12 +500,12 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
                     memcpy(audio->url, url, len);
                     audio->url[len] = '\0';
                     extend_url(&(audio->url), ma->url);
-                    
+
                     audio->grp_id = strdup(grp_id);
                     audio->name = strdup(name);
                     audio->lang = lang ? strdup(lang) : NULL;
                     audio->is_default = is_default;
-                    
+
                     if (ma->audio) {
                         audio->next = ma->audio;
                     }
@@ -514,11 +514,11 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
             }
         } else if (url_expected) {
             size_t len = strlen(src);
-            
+
             // here we will fill new playlist
             hls_media_playlist_t *me = malloc(sizeof(hls_media_playlist_t));
             memset(me, 0x00, sizeof(hls_media_playlist_t));
-            
+
             me->url = malloc(len + 1);
             memcpy(me->url, src, len);
             me->url[len] = '\0';
@@ -527,15 +527,15 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
             me->audio_grp = audio_grp ? strdup(audio_grp) : NULL;
             me->resolution = res ? strdup(res) : strdup("unknown");
             me->codecs = codecs ? strdup(codecs) : strdup("unknown");
-            
+
             if (ma->media_playlist) {
                 me->next = ma->media_playlist;
             }
             ma->media_playlist = me;
-            
+
             url_expected = false;
         }
-        
+
         src = end_ptr + 1;
     }
 
@@ -548,15 +548,15 @@ static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const 
     uint8_t *av_data = in->data;
     uint32_t av_size = in->pos;
 
-    uint8_t ts_header[4] = {TS_SYNC_BYTE, 0x40, 0x00, 0x10}; 
+    uint8_t ts_header[4] = {TS_SYNC_BYTE, 0x40, 0x00, 0x10};
     ts_header[1] = ((pid >> 8) & 0x1F) | 0x40; // 0x40 - set payload_unit_start_indicator
     ts_header[2] = pid & 0xFF;
-    
+
     uint8_t adapt_header[8] = {0x00};
     uint8_t adapt_header_size = 0;
     uint32_t payload_size = TS_PACKET_LENGTH - sizeof(ts_header);
     if (pcr[0] & 0x10) {
-        adapt_header_size = 8; 
+        adapt_header_size = 8;
         adapt_header[1] = pcr[0] & 0xF0; // set previus flags: discontinuity_indicator, random_access_indicator, elementary_stream_priority_indicator, PCR_flag
     } else if (pcr[0] & 0x20) {
         adapt_header_size = 2;
@@ -608,7 +608,7 @@ static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const 
         uint32_t packets_num = av_size / (TS_PACKET_LENGTH - 4);
         uint32_t p;
         ts_header[1] &= 0xBF; // unset payload_unit_start_indicator
-        ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag 
+        ts_header[3] = (ts_header[3] & 0xcf) | 0x10; // unset addaptation filed flag
         for (p=0; p < packets_num; ++p) {
            ts_header[3] = (ts_header[3] & 0xf0) | (*cont_count);
            *cont_count = (*cont_count + 1) % 16;
@@ -653,7 +653,7 @@ static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const 
             av_size -= av_size;
         }
     }
-    
+
     return 0;
 }
 
@@ -673,7 +673,7 @@ static uint8_t * remove_emulation_prev(const uint8_t  *src,
 
     while (src < src_end)
         *dst++ = *src++;
-        
+
     return dst;
 }
 
@@ -740,7 +740,7 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
             AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
             while (nal_start + 16 < nal_end) {
                 AES128_CBC_DecryptUpdate(ctx, nal_start, nal_start, 16);
-                nal_start += 16 * 10; // Each 16-byte block of encrypted data is followed by up to nine 16-byte blocks of unencrypted data. 
+                nal_start += 16 * 10; // Each 16-byte block of encrypted data is followed by up to nine 16-byte blocks of unencrypted data.
             }
             AES128_CBC_free(ctx);
         }
@@ -788,7 +788,7 @@ static int sample_aes_decrypt_audio_data(hls_media_segment_t *s, uint8_t *ptr, u
             // unencrypted leader
             leaderSize = 16;
         }
-        
+
         int tmp_size = frame_length > leaderSize ? (frame_length - leaderSize) & 0xFFFFFFF0  : 0;
         if (tmp_size) {
             void *ctx = AES128_CBC_CTX_new();
@@ -819,7 +819,7 @@ static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out,
         MSG_ERROR("Wrong PES header size %hu!\n", &pes_header_size);
         return -1;
     }
-    
+
     if (AUDIO_UNKNOWN == audio_codec) {
         // handle video data in NAL units
         int size = sample_aes_decrypt_nal_units(s, in->data + pes_header_size, in->pos - pes_header_size) + pes_header_size;
@@ -866,7 +866,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                 switch (stream_type) {
                     case 0xdb:
                         video_PID = pmt.components[i].elementary_PID;
-                        stream_type = 0x1B; // AVC video stream as defined in ITU-T Rec. H.264 | ISO/IEC 14496-10 Video, or AVC base layer of an HEVC video stream as defined in ITU-T H.265 | ISO/IEC 23008-2 
+                        stream_type = 0x1B; // AVC video stream as defined in ITU-T Rec. H.264 | ISO/IEC 14496-10 Video, or AVC base layer of an HEVC video stream as defined in ITU-T H.265 | ISO/IEC 23008-2
                         break;
                     case 0xcf:
                         audio_codec = AUDIO_ADTS;
@@ -941,13 +941,13 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                         ByteBuffer_t *pCurrBuffer = packed.pid == audio_PID ? &audioBuffer : &videoBuffer;
                         uint8_t *pcr = packed.pid == audio_PID ? audio_pcr : video_pcr;
                         uint8_t *counter = packed.pid == audio_PID ? &audio_counter : &video_counter;
-                        
+
                         if (packed.unitstart) {
                             // consume previous data if any
                             if (pCurrBuffer->pos) {
                                 sample_aes_handle_pes_data(s, &outBuffer, pCurrBuffer, pcr, packed.pid, packed.pid == audio_PID ? audio_codec : AUDIO_UNKNOWN, counter);
                             }
-                            
+
                             if ((packed.afc & 2) && (ptr[5] & 0x10)) { // remember PCR if available
                                 memcpy(pcr, ptr + 4 + 1, 6);
                             } else if ((packed.afc & 2) && (ptr[5] & 0x20)) { // remember discontinuity_indicator if set
@@ -957,7 +957,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                             }
                             pCurrBuffer->pos = 0;
                         }
-                        
+
                         if (packed.payload_offset < TS_PACKET_LENGTH) {
                             memcpy(&(pCurrBuffer->data[pCurrBuffer->pos]), ptr + packed.payload_offset, TS_PACKET_LENGTH - packed.payload_offset);
                             pCurrBuffer->pos += TS_PACKET_LENGTH - packed.payload_offset;
@@ -966,27 +966,27 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                         memcpy(&outBuffer.data[outBuffer.pos], ptr, TS_PACKET_LENGTH);
                         outBuffer.pos += TS_PACKET_LENGTH;
                     }
-                    
+
                     ptr += TS_PACKET_LENGTH;
                     packet_id += 1;
                 }
-                
+
                 if (audioBuffer.pos) {
                     sample_aes_handle_pes_data(s, &outBuffer, &audioBuffer, audio_pcr, audio_PID, audio_codec, &audio_counter);
                 }
-                
+
                 if (videoBuffer.pos) {
                     sample_aes_handle_pes_data(s, &outBuffer, &videoBuffer, video_pcr, video_PID, AUDIO_UNKNOWN, &video_counter);
                 }
-                
+
                 if (outBuffer.pos > buf->len ) {
                     MSG_ERROR("decrypt_sample_aes - buffer overflow detected!\n");
                     exit(-1);
                 }
-                
+
                 free(videoBuffer.data);
                 free(audioBuffer.data);
-                
+
                 // replace encrypted data with decrypted one
                 free(buf->data);
                 buf->data = outBuffer.data;
@@ -1003,7 +1003,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
         MSG_WARNING("Unknown segment type!\n");
         ret = -1;
     }
-    
+
     return ret;
 }
 
@@ -1014,9 +1014,9 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
     fill_key_value(&(s->enc_aes));
 
     void *ctx = AES128_CBC_CTX_new();
-    /* some AES-128 encrypted segments could be not correctly padded 
+    /* some AES-128 encrypted segments could be not correctly padded
      * and decryption with padding will fail - example stream with such problem is welcome
-     * From other hand dump correctly padded segment will contain trashes, which will cause many 
+     * From other hand dump correctly padded segment will contain trashes, which will cause many
      * errors during processing such TS, for example by DVBInspector,
      * if padding will be not removed.
      */
@@ -1046,26 +1046,26 @@ static void *hls_playlist_update_thread(void *arg)
 #endif
 
     hls_playlist_updater_params *updater_params = arg;
-    
+
     hls_media_playlist_t *me = updater_params->media_playlist;
     pthread_mutex_t *media_playlist_mtx         = (pthread_mutex_t *)(updater_params->media_playlist_mtx);
-    
+
     pthread_cond_t  *media_playlist_refresh_cond = (pthread_cond_t *)(updater_params->media_playlist_refresh_cond);
     pthread_cond_t  *media_playlist_empty_cond   = (pthread_cond_t *)(updater_params->media_playlist_empty_cond);
-    
+
     void *session = init_hls_session();
     set_timeout_session(session, 2L, 3L);
     bool is_endlist = false;
     //char *url = NULL;
     int refresh_delay_s = 0;
-    
+
     // no lock is needed here because download_live_hls not change this fields
     //pthread_mutex_lock(media_playlist_mtx);
     is_endlist = me->is_endlist;
     if (hls_args.refresh_delay_sec < 0) {
         refresh_delay_s = (int)(me->target_duration_ms / 1000);
         //pthread_mutex_unlock(media_playlist_mtx);
-        
+
         if (refresh_delay_s > HLSDL_MAX_REFRESH_DELAY_SEC) {
             refresh_delay_s = HLSDL_MAX_REFRESH_DELAY_SEC;
         } else if (refresh_delay_s < HLSDL_MIN_REFRESH_DELAY_SEC) {
@@ -1074,7 +1074,7 @@ static void *hls_playlist_update_thread(void *arg)
     } else {
         refresh_delay_s = hls_args.refresh_delay_sec;
     }
-    
+
     struct timespec ts;
     memset(&ts, 0x00, sizeof(ts));
     MSG_VERBOSE("Update thread started\n");
@@ -1084,28 +1084,28 @@ static void *hls_playlist_update_thread(void *arg)
         pthread_mutex_lock(media_playlist_mtx);
         pthread_cond_timedwait(media_playlist_refresh_cond, media_playlist_mtx, &ts);
         pthread_mutex_unlock(media_playlist_mtx);
-        
+
         // update playlist
         hls_media_playlist_t new_me;
         memset(&new_me, 0x00, sizeof(new_me));
-        
+
         size_t size = 0;
         MSG_PRINT("> START DOWNLOAD LIST url[%s]\n", me->url);
         long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url), NULL);
         MSG_PRINT("> END DOWNLOAD LIST\n");
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
-            if (new_me.is_endlist || 
-                new_me.first_media_sequence != me->first_media_sequence || 
+            if (new_me.is_endlist ||
+                new_me.first_media_sequence != me->first_media_sequence ||
                 new_me.last_media_sequence != me->last_media_sequence)
             {
                 bool list_extended = false;
-                // we need to update list 
+                // we need to update list
                 pthread_mutex_lock(media_playlist_mtx);
                 me->is_endlist = new_me.is_endlist;
                 is_endlist = new_me.is_endlist;
                 me->first_media_sequence = new_me.first_media_sequence;
-                
+
                 if (new_me.last_media_sequence > me->last_media_sequence)
                 {
                     // add new segments
@@ -1116,32 +1116,32 @@ static void *hls_playlist_update_thread(void *arg)
                                 ms->prev->next = NULL;
                             }
                             ms->prev = NULL;
-                            
+
                             if (me->last_media_segment) {
                                 me->last_media_segment->next = ms;
                             } else {
                                 assert(me->first_media_segment == NULL);
                                 me->first_media_segment = ms;
                             }
-                            
+
                             me->last_media_segment = new_me.last_media_segment;
                             me->last_media_sequence = new_me.last_media_sequence;
-                            
+
                             if (ms == new_me.first_media_segment) {
                                 // all segments are new
                                 new_me.first_media_segment = NULL;
                                 new_me.last_media_segment = NULL;
                             }
-                            
+
                             while (ms) {
                                 me->total_duration_ms += ms->duration_ms;
                                 ms = ms->next;
                             }
-                            
+
                             list_extended = true;
                             break;
                         }
-                        
+
                         ms = ms->next;
                     }
                 }
@@ -1162,7 +1162,7 @@ static void *hls_playlist_update_thread(void *arg)
         }
         media_playlist_cleanup(&new_me);
     }
-    
+
     clean_http_session(session);
     pthread_exit(NULL);
     return NULL;
@@ -1173,30 +1173,30 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     MSG_API("{\"d_t\":\"live\"}\n");
 
     hls_playlist_updater_params updater_params;
-    
+
     /* declaration synchronization prymitives */
     pthread_mutex_t media_playlist_mtx;
-        
+
     pthread_cond_t  media_playlist_refresh_cond;
     pthread_cond_t  media_playlist_empty_cond;
-    
+
     /* init synchronization prymitives */
     pthread_mutex_init(&media_playlist_mtx, NULL);
-    
+
     pthread_cond_init(&media_playlist_refresh_cond, NULL);
     pthread_cond_init(&media_playlist_empty_cond, NULL);
-    
+
     memset(&updater_params, 0x00, sizeof(updater_params));
     updater_params.media_playlist = me;
-    updater_params.media_playlist_mtx = (void *)&media_playlist_mtx;  
-    updater_params.media_playlist_refresh_cond = (void *)&media_playlist_refresh_cond;    
-    updater_params.media_playlist_empty_cond   = (void *)&media_playlist_empty_cond;    
-    
+    updater_params.media_playlist_mtx = (void *)&media_playlist_mtx;
+    updater_params.media_playlist_refresh_cond = (void *)&media_playlist_refresh_cond;
+    updater_params.media_playlist_empty_cond   = (void *)&media_playlist_empty_cond;
+
     // skip first segments
     if (me->first_media_segment != me->last_media_segment) {
         struct hls_media_segment *ms = me->last_media_segment;
         uint64_t duration_ms = 0;
-        uint64_t duration_offset_ms = hls_args.live_start_offset_sec * 1000; 
+        uint64_t duration_offset_ms = hls_args.live_start_offset_sec * 1000;
         while (ms) {
             duration_ms += ms->duration_ms;
             if (duration_ms >= duration_offset_ms) {
@@ -1204,9 +1204,9 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             }
             ms = ms->prev;
         }
-        
+
         if (ms && ms != me->first_media_segment){
-            // remove segments 
+            // remove segments
             while (me->first_media_segment != ms) {
                 struct hls_media_segment *tmp_ms = me->first_media_segment;
                 me->first_media_segment = me->first_media_segment->next;
@@ -1215,16 +1215,16 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             ms->prev = NULL;
             me->first_media_segment = ms;
         }
-        
+
         me->total_duration_ms = get_duration_hls_media_playlist(me);
     }
-    
+
     // start update thread
     pthread_t thread;
     void *ret;
-    
+
     pthread_create(&thread, NULL, hls_playlist_update_thread, &updater_params);
-    
+
     void *session = init_hls_session();
     set_timeout_session(session, 2L, 3L);
     uint64_t downloaded_duration_ms = 0;
@@ -1233,7 +1233,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     bool download = true;
     char range_buff[22];
     while(download) {
-        
+
         pthread_mutex_lock(&media_playlist_mtx);
         struct hls_media_segment *ms = me->first_media_segment;
         if (ms != NULL) {
@@ -1256,7 +1256,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
         if (ms == NULL) {
             continue;
         }
-        
+
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         int retries = 0;
         char *range = NULL;
@@ -1276,11 +1276,11 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
                     free(seg.data);
                     seg.data  = NULL;
                 }
-                
+
                 pthread_mutex_lock(&media_playlist_mtx);
                 first_media_sequence = me->first_media_sequence;
                 pthread_mutex_unlock(&media_playlist_mtx);
-                
+
                 if(http_code != 403 && http_code != 401 &&  http_code != 410 && retries <= hls_args.segment_download_retries && ms->sequence_number > first_media_sequence) {
                     clean_http_session(session);
                     sleep(1);
@@ -1299,37 +1299,37 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
                     break;
                 }
             }
-            
+
             downloaded_duration_ms += ms->duration_ms;
-            
+
             if (me->encryption == true && me->encryptiontype == ENC_AES128) {
                 decrypt_aes128(ms, &seg);
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
                 decrypt_sample_aes(ms, &seg);
             }
-            download_size += out_ctx->write(seg.data, 1, seg.len, out_ctx->opaque);
+            download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
             free(seg.data);
-            
+
             set_fresh_connect_http_session(session, 0);
-            
+
             time_t curRepTime = time(NULL);
             if ((curRepTime - repTime) >= 1) {
                 MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
                 repTime = curRepTime;
             }
-            
+
             break;
         } while(true);
-        
+
         media_segment_cleanup(ms);
     }
-    
+
     pthread_join(thread, &ret);
     pthread_mutex_destroy(&media_playlist_mtx);
-    
+
     pthread_cond_destroy(&media_playlist_refresh_cond);
     pthread_cond_destroy(&media_playlist_empty_cond);
-    
+
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
     if (session)
     {
@@ -1388,8 +1388,8 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
         }
     }
 
-    /* normally we want to reuse sessions, 
-     * so restore it in case when fresh session 
+    /* normally we want to reuse sessions,
+     * so restore it in case when fresh session
      * was requested do to re-try
      */
     if (retries) {
@@ -1431,7 +1431,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
             break;
         }
 
-        // first segment should be TS for success merge 
+        // first segment should be TS for success merge
         if (ms_audio && seg.len > TS_PACKET_LENGTH && seg.data[0] == TS_SYNC_BYTE) {
             if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
                 break;
@@ -1442,7 +1442,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
             free(seg_audio.data);
             ms_audio = ms_audio->next;
         } else {
-            download_size += out_ctx->write(seg.data, 1, seg.len, out_ctx->opaque);
+            download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
         }
 
         free(seg.data);
@@ -1457,9 +1457,9 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
 
         ms = ms->next;
     }
-    
+
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
-    
+
     if (session) {
         clean_http_session(session);
     }
@@ -1554,17 +1554,17 @@ int fill_key_value(struct enc_aes128 *es)
     /* temporary we will create cache with keys url here
      * this will make this function thread unsafe but at now
      * it is not problem because it is used only from one thread
-     * 
+     *
      * last allocation of cache_key_url will not be free
-     * but this is not big problem since this code is run 
-     * as standalone process 
+     * but this is not big problem since this code is run
+     * as standalone process
      *(system will free all memory allocated by process at it exit).
      *
      * But this must be fixed for clear valgrind memory leak detection.
      */
     static char cache_key_value[KEYLEN] = "";
-    static char *cache_key_url = NULL; 
-    
+    static char *cache_key_url = NULL;
+
     if (es && es->key_url)
     {
         if (cache_key_url && 0 == strcmp(cache_key_url, es->key_url))
@@ -1577,7 +1577,7 @@ int fill_key_value(struct enc_aes128 *es)
             char *key_value = NULL;
             size_t size = 0;
             long http_code = 0;
-            
+
             if (NULL != hls_args.key_uri_replace_old && \
                 NULL != hls_args.key_uri_replace_new && \
                 '\0' != hls_args.key_uri_replace_old[0]) {
@@ -1590,7 +1590,7 @@ int fill_key_value(struct enc_aes128 *es)
             if (es->key_url != key_url) {
                 free(key_url);
             }
-            
+
             if (http_code != 200 || size == 0) {
                 MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
                 return 1;
@@ -1598,15 +1598,15 @@ int fill_key_value(struct enc_aes128 *es)
 
             memcpy(es->key_value, key_value, KEYLEN);
             free(key_value);
-            
+
             free(cache_key_url);
             cache_key_url = strdup(es->key_url);
             memcpy(cache_key_value, es->key_value, KEYLEN);
         }
-        
+
         free(es->key_url);
         es->key_url = NULL;
     }
-    
+
     return 0;
 }
