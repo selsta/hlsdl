@@ -21,8 +21,8 @@
 #include "msg.h"
 #include "misc.h"
 
-static size_t priv_write(const void *ptr, size_t size, size_t n, void *opaque) {
-    return fwrite(ptr, size, n, opaque);
+static size_t priv_write(const uint8_t *data, size_t len, void *opaque) {
+    return fwrite(data, 1, len, opaque);
 }
 
 static bool is_file_exists(const char *filename)
@@ -43,7 +43,7 @@ static FILE* get_output_file(void)
     FILE *pFile = NULL;
 
     if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
-        // Set "stdout" to have binary mode:  
+        // Set "stdout" to have binary mode:
         fflush(stdout);
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
         pFile = freopen(NULL, "wb", stdout);
@@ -110,11 +110,11 @@ static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_
         }
         break;
     }
-    
+
     if (http_code != 200) {
         MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
-    } 
-    
+    }
+
     if (size == 0) {
         MSG_API("{\"error_code\":-1, \"error_msg\":\"No result from server.\"}\n");
         return false;
@@ -197,28 +197,28 @@ int main(int argc, char *argv[])
                 MSG_ERROR("Wrong input!\n");
                 exit(1);
             }
-            
+
             i = 1;
             me = master_playlist.media_playlist;
             while (i < quality_choice) {
                 i += 1;
                 me = me->next;
             }
-            
+
             selected = me;
         }
-        
+
         if (!selected) {
             MSG_ERROR("Wrong selection!\n");
             exit(1);
         }
-        
+
         if (selected->audio_grp) {
             // check if have valid group
             hls_audio_t *selected_audio = NULL;
             hls_audio_t *audio = master_playlist.audio;
             bool has_audio_playlist = false;
-            
+
             while (audio) {
                 if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
                     if (has_audio_playlist) {
@@ -230,12 +230,12 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            
+
             if (has_audio_playlist) {
                 // print hls master playlist
                 int audio_choice = 0;
                 int i = 1;
-                
+
                 if (!selected_audio) {
                     if (!hls_args.use_best) {
                         audio = master_playlist.audio;
@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
                             audio = audio->next;
                         }
                     }
-                    
+
                     i = 0;
                     audio = master_playlist.audio;
                     while (audio) {
@@ -288,15 +288,15 @@ int main(int argc, char *argv[])
                 audio_media_playlist.orig_url = strdup(selected_audio->url);
             }
         }
-        
-        // make copy of structure 
+
+        // make copy of structure
         memcpy(&media_playlist, selected, sizeof(media_playlist));
         /* we will take this attrib to selected playlist */
         selected->url = NULL;
         selected->audio_grp = NULL;
         selected->resolution = NULL;
         selected->codecs = NULL;
-        
+
         media_playlist.orig_url = strdup(media_playlist.url);
         master_playlist_cleanup(&master_playlist);
     } else if (playlist_type == MEDIA_PLAYLIST) {
@@ -312,9 +312,9 @@ int main(int argc, char *argv[])
     } else {
         return 1;
     }
-    
+
     if (audio_media_playlist.orig_url) {
-        
+
         if ( !get_data_with_retry(audio_media_playlist.orig_url, &audio_media_playlist.source, &audio_media_playlist.url, hls_args.open_max_retries)) {
             return 1;
         }
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
- 
+
     if (handle_hls_media_playlist(&media_playlist)) {
         return 1;
     }
