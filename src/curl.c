@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pthread.h>
 #include <curl/curl.h>
 #include <assert.h>
 #include "msg.h"
@@ -14,6 +15,8 @@ struct http_session {
     void *headers;
     char *user_agent;
     char *proxy_uri;
+    char *cookie_file;
+    void *cookie_file_mutex;
     long speed_limit;
     long speed_time;
 };
@@ -116,6 +119,22 @@ void * set_proxy_uri_http_session(void *ptr_session, const char *proxy_uri)
     return session;
 }
 
+void * set_cookie_file_session(void *ptr_session, const char *cookie_file, void *cookie_file_mutex)
+{
+    struct http_session *session = ptr_session;
+    assert(session);
+
+    if (cookie_file) {
+        if (session->cookie_file) {
+            free(session->cookie_file);
+        }
+        session->cookie_file = strdup(cookie_file);
+        session->cookie_file_mutex = cookie_file_mutex;
+    }
+
+    return session;
+}
+
 void add_custom_header_http_session(void *ptr_session, const char *header)
 {
     struct http_session *session = ptr_session;
@@ -163,7 +182,8 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     curl_easy_setopt(c, CURLOPT_RANGE, range);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
-    
+    curl_easy_setopt(c, CURLOPT_VERBOSE, 1L);
+   
     if (session->speed_limit) {
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, session->speed_limit);
     }
@@ -188,6 +208,17 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     
     if (session->proxy_uri) {
         curl_easy_setopt(c, CURLOPT_PROXY, session->proxy_uri);
+    }
+
+    if (session->cookie_file) {
+        curl_easy_setopt(c, CURLOPT_COOKIEJAR, session->cookie_file);
+        curl_easy_setopt(c, CURLOPT_COOKIEFILE, session->cookie_file);
+
+        if (session->cookie_file_mutex) {
+            pthread_mutex_lock(session->cookie_file_mutex);
+            curl_easy_setopt(c, CURLOPT_COOKIELIST, "RELOAD");
+            pthread_mutex_unlock(session->cookie_file_mutex);
+        } 
     }
     
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
@@ -224,6 +255,12 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
         free(chunk.memory);
     }
 
+    if (session->cookie_file && session->cookie_file_mutex) {
+        pthread_mutex_lock(session->cookie_file_mutex);
+        curl_easy_setopt(c, CURLOPT_COOKIELIST, "FLUSH");
+        pthread_mutex_unlock(session->cookie_file_mutex);
+    }
+
     return http_code;
 }
 
@@ -232,14 +269,16 @@ void clean_http_session(void *ptr_session)
     struct http_session *session = ptr_session;
     curl_easy_cleanup(session->handle);
     
-    /* free user agent if set */ 
     if (session->user_agent) {
         free(session->user_agent);
     }
     
-    /* free user agent if set */ 
     if (session->proxy_uri) {
         free(session->proxy_uri);
+    }
+
+    if (session->cookie_file) {
+        free(session->cookie_file);
     }
     
     /* free the custom headers if set */ 

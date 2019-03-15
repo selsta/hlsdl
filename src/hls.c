@@ -73,6 +73,10 @@ static void set_hls_http_header(void *session)
         set_proxy_uri_http_session(session, hls_args.proxy_uri);
     }
 
+    if (hls_args.cookie_file) {
+        set_cookie_file_session(session, hls_args.cookie_file, hls_args.cookie_file_mutex);
+    }
+
     for (int i=0; i<HLSDL_MAX_NUM_OF_CUSTOM_HEADERS; ++i) {
         if (hls_args.custom_headers[i]) {
             add_custom_header_http_session(session, hls_args.custom_headers[i]);
@@ -1176,12 +1180,14 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
 
     /* declaration synchronization prymitives */
     pthread_mutex_t media_playlist_mtx;
+    pthread_mutex_t cookie_file_mtx;
 
     pthread_cond_t  media_playlist_refresh_cond;
     pthread_cond_t  media_playlist_empty_cond;
 
     /* init synchronization prymitives */
     pthread_mutex_init(&media_playlist_mtx, NULL);
+    pthread_mutex_init(&cookie_file_mtx, NULL);
 
     pthread_cond_init(&media_playlist_refresh_cond, NULL);
     pthread_cond_init(&media_playlist_empty_cond, NULL);
@@ -1191,6 +1197,8 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     updater_params.media_playlist_mtx = (void *)&media_playlist_mtx;
     updater_params.media_playlist_refresh_cond = (void *)&media_playlist_refresh_cond;
     updater_params.media_playlist_empty_cond   = (void *)&media_playlist_empty_cond;
+
+    hls_args.cookie_file_mutex = (void *)&cookie_file_mtx;
 
     // skip first segments
     if (me->first_media_segment != me->last_media_segment) {
@@ -1329,6 +1337,9 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
 
     pthread_cond_destroy(&media_playlist_refresh_cond);
     pthread_cond_destroy(&media_playlist_empty_cond);
+
+    pthread_mutex_destroy(&cookie_file_mtx);
+    hls_args.cookie_file_mutex = NULL;
 
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
     if (session)

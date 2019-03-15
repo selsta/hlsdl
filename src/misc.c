@@ -16,7 +16,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.24\n");
+    printf("hlsdl v0.25\n");
     printf("(c) 2017-2019 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"
@@ -36,7 +36,8 @@ static void print_help(const char *filename)
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
            "-a ... Set additional url to the audio media playlist.\n"
-           "-c ... Treat HTTP code 206 as 200 even if request was made without range header.\n", filename);
+           "-c ... Treat HTTP code 206 as 200 even if request was made without range header.\n"
+           "-C ... the file name of file holding cookie data in the old Netscape / Mozilla cookie data format.\n", filename);
     exit(0);
 }
 
@@ -45,7 +46,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:")) != -1) 
+    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1) 
     {
         switch (c) 
         {
@@ -90,6 +91,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'u':
             hls_args.user_agent = optarg;
+            break;
+        case 'C':
+            hls_args.cookie_file = optarg;
             break;
         case 'p':
             hls_args.proxy_uri = optarg;

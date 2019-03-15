@@ -44,6 +44,8 @@ struct hls_args {
     char *(custom_headers[HLSDL_MAX_NUM_OF_CUSTOM_HEADERS]);
     char *key_uri_replace_old;
     char *key_uri_replace_new;
+    char *cookie_file;
+    void *cookie_file_mutex;
     bool accept_partial_content;
 };
 
