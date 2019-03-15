@@ -16,7 +16,7 @@
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.25\n");
+    printf("hlsdl v0.26\n");
     printf("(c) 2017-2019 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s url [options]\n\n"
            "-b ... Automaticly choose the best quality.\n"

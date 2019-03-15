@@ -497,16 +497,18 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
 {
     bool bRet = false;
 
-    if (sizeof(pmt1->components) / sizeof(pmt1->components[0]) <= pmt1->component_num)
+    if (sizeof(pmt1->components) / sizeof(pmt1->components[0]) <= pmt1->component_num + pmt2->component_num)
     {
         MSG_ERROR("Components table to small!!!\n");
         exit(-13);
     }
 
+    /*
     if (pmt2->component_num > 1)
     {
         MSG_WARNING("Audio fragment has more then one component in the PMT component_num: %u!!!!\n", (uint32_t)pmt2->component_num);
     }
+    */
 
     if (pmt1->program != pmt2->program)
     {
@@ -523,18 +525,25 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
 
     // update elementary_PID in component data
     memcpy(ptr, pmt2->data + pmt2->componennt_idx, component_len2);
-    ptr[1] = ePID >> 8;
-    ptr[2] = ePID & 0xFF;
+    for (uint32_t cidx = 0; cidx < pmt2->component_num; ++cidx)
+    {
+        uint32_t idx = pmt2->components[cidx].offset - pmt2->components[0].offset;
+        ptr[idx + 1] = (ePID + cidx) >> 8;
+        ptr[idx + 2] = (ePID + cidx) & 0xFF;
+    }
 
     bRet = merge_pmt_with_audio_component(pmt1, ptr, component_len2, pmt);
     free(ptr);
 
     if (bRet)
     {
-        // add new component to component table
-        pmt->components[pmt->component_num] = pmt2->components[0];
-        pmt->components[pmt->component_num].elementary_PID = ePID;
-        pmt->component_num += 1;
+        // add new components to component table
+        for (uint32_t cidx = 0; cidx < pmt2->component_num; ++cidx)
+        {
+            pmt->components[pmt->component_num] = pmt2->components[cidx];
+            pmt->components[pmt->component_num].elementary_PID = ePID + cidx;
+            pmt->component_num += 1;
+        }
     }
     return bRet;
 }
@@ -966,12 +975,23 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
                     {
                         uint16_t pid = ((pdata2[1] & 0x1f) << 8) | pdata2[2]; // PID - 13b
                         // if (TID_PAT != pid && pid != context->pmt2.pid)
-                        if (pid == context->pmt2.components[0].elementary_PID)
+                        bool found = false;
+                        uint32_t cidx = 0;
+                        for (; cidx < context->pmt2.component_num; ++cidx)
+                        {
+                            if (pid == context->pmt2.components[cidx].elementary_PID)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (found)
                         {
                             if (context->out->write(pdata2, 1, context->out->opaque)) ret += 1;
 
                             // we need to update PID
-                            pid = context->pmt.components[context->pmt.component_num-1].elementary_PID;
+                            pid = context->pmt.components[context->pmt.component_num - (context->pmt2.component_num - cidx)].elementary_PID;
                             uint8_t tmp[2];
                             tmp[0] = (pdata2[1] & 0xE0) | (pid >> 8);
                             tmp[1] = pid & 0xFF;

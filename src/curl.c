@@ -182,7 +182,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     curl_easy_setopt(c, CURLOPT_RANGE, range);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(c, CURLOPT_VERBOSE, 1L);
+    //curl_easy_setopt(c, CURLOPT_VERBOSE, 1L);
    
     if (session->speed_limit) {
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, session->speed_limit);
