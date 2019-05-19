@@ -1,4 +1,4 @@
-hlsdl
+hlsdl - project has been closed - please start to use different branch
 ==============
 
 This program converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
