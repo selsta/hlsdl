@@ -14,7 +14,7 @@ Linux:
 `make && make install && make clean`
 
 Windows:
-https://github.com/samsamsam-iptvplayer/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
+https://github.com/selsta/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
 
 
 Usage and Options
