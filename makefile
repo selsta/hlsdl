@@ -8,7 +8,9 @@ OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 S_SRC= src/main.c src/aes_openssl.c src/curl.c src/hls.c src/misc.c src/msg.c src/mpegts.c	
 ifeq ("$(OSNAME)", "darwin")
 	CFLAGS+=-I/usr/local/include/
+	CFLAGS+=-I/usr/local/opt/openssl/include
 	LDFLAGS+=-L/usr/local/lib
+	LDFLAGS+=-L/usr/local/opt/openssl/lib
 else ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
 else ifeq ("$(OSNAME)", "mingw32")
@@ -27,7 +29,7 @@ CFLAGS+=-DPREFIX='"$(PREFIX)"'
 ifeq ("$(OSNAME)", "mingw32")
 	LDFLAGS+=-Wl,-Bstatic -lpthread -lcurl  -lssl -lcrypto -lwsock32 -lws2_32 -lwldap32 -lz
 else
-	LDFLAGS+=-lpthread -lcurl -lcrypto
+	LDFLAGS+=-lpthread -lcurl -lcrypto -lssl
 endif
 
 
