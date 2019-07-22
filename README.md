@@ -62,7 +62,6 @@ ToDo
 -----
 * support for Fragmented MPEG-4 playlist
 * support for EXT-X-MAP in the MPEG-2 Transport Streams playlist
-=======
 
 Ideas
 -----
