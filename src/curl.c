@@ -34,7 +34,7 @@ void * set_timeout_session(void *ptr_session, const long speed_limit, const long
     assert(session);
     session->speed_limit = speed_limit;
     session->speed_time = speed_time;
-    
+
     return session;
 }
 
@@ -43,7 +43,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-    
+
     if (mem->reserved == 0)
     {
         CURLcode res;
@@ -60,7 +60,7 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
             mem->reserved = (int)filesize + 1;
         }
     }
-    
+
     if ((mem->size + realsize + 1) > mem->reserved)
     {
         mem->memory = realloc(mem->memory, mem->size + realsize + 1);
@@ -92,7 +92,7 @@ void * set_user_agent_http_session(void *ptr_session, const char *user_agent)
 {
     struct http_session *session = ptr_session;
     assert(session);
-    
+
     if (user_agent) {
         if (session->user_agent) {
             free(session->user_agent);
@@ -100,7 +100,7 @@ void * set_user_agent_http_session(void *ptr_session, const char *user_agent)
         session->user_agent = malloc(strlen(user_agent)+1);
         strcpy(session->user_agent, user_agent);
     }
-    
+
     return session;
 }
 
@@ -108,14 +108,14 @@ void * set_proxy_uri_http_session(void *ptr_session, const char *proxy_uri)
 {
     struct http_session *session = ptr_session;
     assert(session);
-    
+
     if (proxy_uri) {
         if (session->proxy_uri) {
             free(session->proxy_uri);
         }
         session->proxy_uri = strdup(proxy_uri);
     }
-    
+
     return session;
 }
 
@@ -158,11 +158,11 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     assert(ptr_session && *ptr_session);
     struct http_session *session = *ptr_session;
     struct curl_slist *headers = session->headers;
-    
+
     assert(session->handle);
     assert(url);
     assert(size);
-    
+
     CURL *c = (CURL *)(session->handle);
     CURLcode res;
     long http_code = 0;
@@ -176,27 +176,27 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     chunk.memory[0] = '\0';
     chunk.size = 0;
     chunk.reserved = 0;
-    chunk.c = c; 
+    chunk.c = c;
 
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_RANGE, range);
     curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
     curl_easy_setopt(c, CURLOPT_WRITEDATA, (void *)&chunk);
     //curl_easy_setopt(c, CURLOPT_VERBOSE, 1L);
-   
+
     if (session->speed_limit) {
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, session->speed_limit);
     }
-    
+
     if (session->speed_time) {
-        curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, session->speed_time); 
+        curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, session->speed_time);
     }
-    
+
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     /* curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, 1);*/
     /* enable all supported built-in compressions */
     curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "");
-    
+
     if (session->user_agent) {
         curl_easy_setopt(c, CURLOPT_USERAGENT, session->user_agent);
     } else {
@@ -205,7 +205,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     if (headers) {
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, headers);
     }
-    
+
     if (session->proxy_uri) {
         curl_easy_setopt(c, CURLOPT_PROXY, session->proxy_uri);
     }
@@ -218,13 +218,13 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
             pthread_mutex_lock(session->cookie_file_mutex);
             curl_easy_setopt(c, CURLOPT_COOKIELIST, "RELOAD");
             pthread_mutex_unlock(session->cookie_file_mutex);
-        } 
+        }
     }
-    
+
     curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
 
     res = curl_easy_perform(c);
-    
+
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &http_code);
     if (new_url && CURLE_OK == curl_easy_getinfo(c, CURLINFO_EFFECTIVE_URL, &e_url))
     {
@@ -248,7 +248,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
             *out = memcpy(*out, chunk.memory, chunk.size);
         }
     }
-    
+
     *size = chunk.size;
 
     if (chunk.memory) {
@@ -268,11 +268,11 @@ void clean_http_session(void *ptr_session)
 {
     struct http_session *session = ptr_session;
     curl_easy_cleanup(session->handle);
-    
+
     if (session->user_agent) {
         free(session->user_agent);
     }
-    
+
     if (session->proxy_uri) {
         free(session->proxy_uri);
     }
@@ -280,12 +280,12 @@ void clean_http_session(void *ptr_session)
     if (session->cookie_file) {
         free(session->cookie_file);
     }
-    
-    /* free the custom headers if set */ 
+
+    /* free the custom headers if set */
     if (session->headers) {
         curl_slist_free_all(session->headers);
     }
-    
+
     free(session);
 }
 
@@ -295,7 +295,7 @@ size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **
     size_t size;
     char *out = NULL;
     get_data_from_url_with_session(&c, url, &out, &size, type, new_url, NULL);
-    
+
     switch (type){
     case STRING:
         *str = out;

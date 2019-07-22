@@ -13,7 +13,7 @@ void * AES128_CBC_CTX_new(void)
 int AES128_CBC_DecryptInit(void *ctx, uint8_t *key, uint8_t *iv, bool with_padding)
 {
     int ret = EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
-    EVP_CIPHER_CTX_set_padding(ctx, with_padding ? 1 : 0); // https://github.com/openssl/openssl/issues/3516, 
+    EVP_CIPHER_CTX_set_padding(ctx, with_padding ? 1 : 0); // https://github.com/openssl/openssl/issues/3516,
     return ret;
 }
 
@@ -21,7 +21,7 @@ int AES128_CBC_DecryptUpdate(void *ctx, uint8_t *plaintext, uint8_t *ciphertext,
 {
     int out_size = 0;
     int ret = 1;
-    
+
     if (in_size > 0) {
         ret = EVP_DecryptUpdate(ctx, plaintext, &out_size, ciphertext, in_size);
         if (1 != ret || in_size != out_size) {
@@ -35,7 +35,7 @@ int AES128_CBC_DecryptUpdate(void *ctx, uint8_t *plaintext, uint8_t *ciphertext,
 int AES128_CBC_DecryptPadded(void *ctx, uint8_t *plaintext, uint8_t *ciphertext, int in_size, int *out_size)
 {
     int ret = 1;
-    
+
     if (in_size > 0) {
         ret = EVP_DecryptUpdate(ctx, plaintext, (int *)out_size, ciphertext, in_size);
         if (1 == ret) {

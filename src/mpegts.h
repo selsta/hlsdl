@@ -41,7 +41,7 @@ typedef enum pidtype_e{
 } pidtype_t;
 
 #define TS_PACKET_LENGTH              188
-#define TS_SYNC_BYTE                  0x47 
+#define TS_SYNC_BYTE                  0x47
 #define MAX_COMPONENTS_NUM             10
 
 #define MAX_PES_PACKET_SIZE        (65535)

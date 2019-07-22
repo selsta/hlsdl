@@ -46,9 +46,9 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1) 
+    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
     {
-        switch (c) 
+        switch (c)
         {
         case 'v':
             hls_args.loglevel += 1;
@@ -115,14 +115,14 @@ int parse_argv(int argc, char * const argv[])
             ret = -1;
         }
     }
-    
-    if (0 == ret && (optind+1) == argc) 
+
+    if (0 == ret && (optind+1) == argc)
     {
         ret = 0;
         hls_args.url = argv[optind];
         return 0;
     }
-    
+
     print_help(argv[0]);
     return 1;
 }

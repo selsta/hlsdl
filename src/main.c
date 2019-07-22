@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
 
     if (media_playlist.encryption) {
         MSG_PRINT("HLS Stream is %s encrypted.\n",
-                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" : 
+                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" :
                                                                 "SAMPLE-AES");
     }
 
