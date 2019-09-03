@@ -98,7 +98,7 @@ static void * init_hls_session(void)
 long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url)
 {
     void *session = init_hls_session();
-    long http_code = get_data_from_url_with_session(&session, url, out, size, type, new_url, NULL);
+    long http_code = get_data_from_url_with_session(&session, url, out, size, type, new_url, -1, -1);
     clean_http_session(session);
     return http_code;
 }
@@ -122,6 +122,39 @@ int get_playlist_type(char *source)
     return MEDIA_PLAYLIST;
 }
 
+/*
+ * In response to
+ * http://stackoverflow.com/questions/1634359/is-there-a-reverse-fn-for-strstr
+ *
+ * Basically, strstr but return last occurence, not first.
+ *
+ * This file contains several implementations and a harness to test and
+ * benchmark them.
+ *
+ * Some of the implementations of the actual function are copied from
+ * elsewhere; they are commented with the location. The rest of the coe
+ * was written by Lars Wirzenius (liw@liw.fi) and is hereby released into
+ * the public domain. No warranty. If it turns out to be broken, you get
+ * to keep the pieces.
+ */
+
+ /* By liw. */
+static char* last_strstr(const char* haystack, const char* needle)
+{
+    if (*needle == '\0')
+        return (char*)haystack;
+
+    char* result = NULL;
+    for (;;) {
+        char* p = strstr(haystack, needle);
+        if (p == NULL)
+            break;
+        result = p;
+        haystack = p + 1;
+    }
+
+    return result;
+}
 static int extend_url(char **url, const char *baseurl)
 {
     static const char proxy_marker[] = "englandproxy.co.uk"; // ugly workaround to be fixed
@@ -161,8 +194,7 @@ static int extend_url(char **url, const char *baseurl)
         free(domain);
         return 0;
     }
-
-    else {
+    else if (strstr(baseurl, "://")) {
         // URLs can have '?'. To make /../ work, remove it.
         char *domain = strdup(baseurl);
         char *find_questionmark = strchr(domain, '?');
@@ -176,6 +208,29 @@ static int extend_url(char **url, const char *baseurl)
         strcpy(*url, buffer);
         free(buffer);
         free(domain);
+        return 0;
+    }
+    else {
+        // Assume local URL
+        char* folder = strdup(baseurl);
+        char* separator = "/";
+        char* find_folder = last_strstr(folder, separator);
+        if (find_folder) {
+            *find_folder = '\0';
+        } else {
+            separator = "\\";
+            find_folder = last_strstr(folder, separator);
+            if (find_folder)
+                *find_folder = '\0';
+        }
+        if (find_folder) {
+            char* buffer = malloc(max_length);
+            snprintf(buffer, max_length, "%s%s%s", folder, separator, *url);
+            *url = realloc(*url, strlen(buffer) + 1);
+            strcpy(*url, buffer);
+            free(buffer);
+        }
+        free(folder);
         return 0;
     }
 }
@@ -1098,7 +1153,7 @@ static void *hls_playlist_update_thread(void *arg)
 
         size_t size = 0;
         MSG_PRINT("> START DOWNLOAD LIST url[%s]\n", me->url);
-        long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url), NULL);
+        long http_code = get_data_from_url_with_session(&session, me->url, &new_me.source, &size, STRING, &(new_me.url), -1, -1);
         MSG_PRINT("> END DOWNLOAD LIST\n");
         if (200 == http_code && 0 == media_playlist_get_links(&new_me)) {
             // no mutex is needed here because download_live_hls not change this fields
@@ -1242,7 +1297,6 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     int64_t download_size = 0;
     time_t repTime = 0;
     bool download = true;
-    char range_buff[22];
     while(download) {
 
         pthread_mutex_lock(&media_playlist_mtx);
@@ -1270,18 +1324,13 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
 
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         int retries = 0;
-        char *range = NULL;
-        if (ms->size > -1) {
-            snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, ms->offset, ms->offset + ms->size - 1);
-            range = range_buff;
-        }
         do {
             struct ByteBuffer seg;
             memset(&seg, 0x00, sizeof(seg));
             size_t size = 0;
-            long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, range);
+            long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, ms->offset, ms->size);
             seg.len = (int)size;
-            if (!(http_code == 200 || (http_code == 206 && (range != NULL || hls_args.accept_partial_content)))) {
+            if (!(http_code == 200 || (http_code == 206 && (ms->size > -1 || hls_args.accept_partial_content)))) {
                 int first_media_sequence = 0;
                 if (seg.data) {
                     free(seg.data);
@@ -1357,20 +1406,14 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
 {
     int retries = 0;
     int ret = 0;
-    char range_buff[22];
     while (true) {
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
-        char *range = NULL;
-        if (ms->size > -1) {
-            snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, ms->offset, ms->offset + ms->size - 1);
-            range = range_buff;
-        }
 
         memset(seg, 0x00, sizeof(*seg));
         size_t size = 0;
-        long http_code = get_data_from_url_with_session(psession, ms->url, (char **)&(seg->data), &size, BINARY, NULL, range);
+        long http_code = get_data_from_url_with_session(psession, ms->url, (char **)&(seg->data), &size, BINARY, NULL, ms->offset, ms->size);
         seg->len = (int)size;
-        if (!(http_code == 200 || (http_code == 206 && (range != NULL || hls_args.accept_partial_content)))) {
+        if (!(http_code == 200 || (http_code == 206 && (ms->size > -1 || hls_args.accept_partial_content)))) {
             if (seg->data) {
                 free(seg->data);
                 seg->data = NULL;

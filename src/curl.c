@@ -2,7 +2,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <inttypes.h>
+#include <errno.h>
 #include <pthread.h>
 #include <curl/curl.h>
 #include <assert.h>
@@ -153,8 +154,56 @@ void set_fresh_connect_http_session(void *ptr_session, long val)
     curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, val);
 }
 
-long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url, const char *range)
+size_t get_data_from_localfile(char* filename, char** out, int64_t range_offset, int64_t range_size)
 {
+    int readsize = -1;
+    FILE* fp;
+
+    fp = fopen(filename, "rb");
+    if (fp) {
+        if (range_size < 0) {
+            fseek(fp, 0, SEEK_END);
+            readsize = ftell(fp);
+            rewind(fp);
+        }
+        else {
+            if (fseek(fp, range_offset, SEEK_SET))
+            {
+                MSG_ERROR("%s\n", strerror(errno));
+                return -1;
+            }
+            readsize = range_size;
+        }
+
+        *out = (char*)malloc(sizeof(char) * readsize + 1);
+        if (fread(*out, 1, readsize, fp) != readsize) {
+            MSG_ERROR("fread returned less bytes than required\n");
+            free(*out);
+            return -1;
+        }
+        (*out)[readsize] = 0;
+        fclose(fp);
+    }
+    else {
+        MSG_ERROR("%s\n", strerror(errno));
+        return -1;
+    }
+    return readsize;
+}
+
+long get_data_from_url_with_session(void **ptr_session, char *url, char **out, size_t *size, int type, char **new_url, int64_t range_offset, int64_t range_size)
+{
+    if (!strstr(url, "://")) {
+        int fsize = get_data_from_localfile(url, out, range_offset, range_size);
+        *size = fsize;
+        if (new_url)
+        {
+            free(*new_url);
+            *new_url = strdup(url);
+        }
+        return fsize > 0 ? 200 : 404;
+    }
+
     assert(ptr_session && *ptr_session);
     struct http_session *session = *ptr_session;
     struct curl_slist *headers = session->headers;
@@ -177,6 +226,13 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     chunk.size = 0;
     chunk.reserved = 0;
     chunk.c = c;
+
+    char range_buff[22];
+    char* range = NULL;
+    if (range_size > -1) {
+        snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, range_offset, range_offset + range_size - 1);
+        range = range_buff;
+    }
 
     curl_easy_setopt(c, CURLOPT_URL, url);
     curl_easy_setopt(c, CURLOPT_RANGE, range);
@@ -294,7 +350,7 @@ size_t get_data_from_url(char *url, char **str, uint8_t **bin, int type, char **
     CURL *c = (CURL *)init_http_session();
     size_t size;
     char *out = NULL;
-    get_data_from_url_with_session(&c, url, &out, &size, type, new_url, NULL);
+    get_data_from_url_with_session(&c, url, &out, &size, type, new_url, -1, -1);
 
     switch (type){
     case STRING:
