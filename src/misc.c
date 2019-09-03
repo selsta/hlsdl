@@ -8,7 +8,7 @@
 #ifndef _MSC_VER
 #include <unistd.h>
 #else
-#include <getopt.h>
+#include "..\msvc\win\getopt.h"
 #endif
 
 #include "misc.h"
