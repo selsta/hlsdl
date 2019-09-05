@@ -800,8 +800,10 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
             break;
 
         nal_end = ff_avc_find_startcode(nal_start, end);
+        int nal_unit_type = *nal_start & 0x1F;
+        int nal_size = nal_end - nal_start;
         // NAL unit with length of 48 bytes or fewer is completely unencrypted.
-        if (nal_end - nal_start > 48) {
+        if ((nal_unit_type == 1 || nal_unit_type == 5) && nal_size > 48) {
             nal_start += 32;
             void *ctx = AES128_CBC_CTX_new();
             AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
