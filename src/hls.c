@@ -745,6 +745,30 @@ static uint8_t * remove_emulation_prev(const uint8_t  *src,
     return dst;
 }
 
+static int insert_emulation_prev(   const uint8_t   *src,
+                                    const uint8_t   *src_end,
+                                          uint8_t   *dst,
+                                          uint8_t   *dst_end)
+{
+    int bytes_inserted = 0;
+    while (src + 2 < src_end && dst + 3 < dst_end)
+        if (!*src && !*(src + 1) && *(src + 2) < 3) {
+            *dst++ = *src++;
+            *dst++ = *src++;
+            *dst++ = 3; // insert emulation_prevention_three_byte
+            *dst++ = *src++;
+            bytes_inserted++;
+        }
+        else {
+            *dst++ = *src++;
+        }
+
+    while (src < src_end)
+        *dst++ = *src++;
+
+    return bytes_inserted;
+}
+
 static uint8_t *ff_avc_find_startcode_internal(uint8_t *p, uint8_t *end)
 {
     uint8_t *a = p + 4 - ((intptr_t)p & 3);
@@ -791,6 +815,8 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
     uint8_t *end = buf_in + size;
     uint8_t *nal_start;
     uint8_t *nal_end;
+    uint8_t* nal_new_start = NULL;
+    int      nal_new_allocated = 0;
     end = remove_emulation_prev(buf_in, end, buf_in, end);
 
     nal_start = ff_avc_find_startcode(buf_in, end);
@@ -804,6 +830,7 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
         int nal_size = nal_end - nal_start;
         // NAL unit with length of 48 bytes or fewer is completely unencrypted.
         if ((nal_unit_type == 1 || nal_unit_type == 5) && nal_size > 48) {
+            uint8_t* nal_start_bkup = nal_start;
             nal_start += 32;
             void *ctx = AES128_CBC_CTX_new();
             AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, false);
@@ -812,9 +839,25 @@ static int sample_aes_decrypt_nal_units(hls_media_segment_t *s, uint8_t *buf_in,
                 nal_start += 16 * 10; // Each 16-byte block of encrypted data is followed by up to nine 16-byte blocks of unencrypted data.
             }
             AES128_CBC_free(ctx);
+            nal_start = nal_start_bkup;
         }
-        nal_start = nal_end;
+        int bytes_inserted = 0;
+        if (nal_size) {
+            int nal_new_maxsize = nal_size * 4 / 3;
+            nal_new_start = realloc(nal_new_start, nal_new_maxsize);
+            nal_new_allocated = MAX(nal_new_allocated, nal_new_maxsize);
+            bytes_inserted = insert_emulation_prev(nal_start, nal_end, nal_new_start, nal_new_start + nal_new_maxsize);
+        }
+        if (bytes_inserted) {
+            memmove(nal_end + bytes_inserted, nal_end, end - nal_end);
+            memcpy(nal_start, nal_new_start, nal_size + bytes_inserted);
+            nal_start = nal_end + bytes_inserted;
+            end += bytes_inserted;
+        }
+        else
+            nal_start = nal_end;
     }
+    free(nal_new_start);
     return (int)(end - buf_in);
 }
 
@@ -969,7 +1012,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                 uint8_t audio_pcr[7]; // first byte is adaptation filed flags
                 uint8_t video_pcr[7]; // - || -
                 ByteBuffer_t outBuffer = {NULL};
-                outBuffer.data = malloc(buf->len);
+                outBuffer.data = malloc(buf->len * 4 / 3);
                 outBuffer.len = buf->len;
 
                 ByteBuffer_t audioBuffer = {NULL};
@@ -981,7 +1024,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                 }
 
                 if (video_PID != PID_UNSPEC) {
-                    videoBuffer.data = malloc(buf->len);
+                    videoBuffer.data = malloc(buf->len * 4 / 3);    // reserve space for emulation_prevention_three_byte
                     videoBuffer.len = buf->len;
                 }
 

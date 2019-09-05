@@ -9,6 +9,7 @@ extern "C" {
 #include <stdbool.h>
 
 #define STRLEN_BTS(LEN) (((LEN) * 2) + 2)
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
 
 #define MAX_FILENAME_LEN 256
 #define MAX_URL_LEN 2048
