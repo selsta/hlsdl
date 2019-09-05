@@ -626,6 +626,7 @@ static int sample_aes_append_av_data(ByteBuffer_t *out, ByteBuffer_t *in, const 
     if (pcr[0] & 0x10) {
         adapt_header_size = 8;
         adapt_header[1] = pcr[0] & 0xF0; // set previus flags: discontinuity_indicator, random_access_indicator, elementary_stream_priority_indicator, PCR_flag
+        memcpy(adapt_header + 2, pcr + 1, 6);
     } else if (pcr[0] & 0x20) {
         adapt_header_size = 2;
         adapt_header[1] = pcr[0] & 0xF0; // restore flags as described above
@@ -1060,7 +1061,7 @@ static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
                             }
 
                             if ((packed.afc & 2) && (ptr[5] & 0x10)) { // remember PCR if available
-                                memcpy(pcr, ptr + 4 + 1, 6);
+                                memcpy(pcr, ptr + 4 + 1, 7);
                             } else if ((packed.afc & 2) && (ptr[5] & 0x20)) { // remember discontinuity_indicator if set
                                 pcr[0] = ptr[5];
                             } else {
