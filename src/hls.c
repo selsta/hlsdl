@@ -331,6 +331,9 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
             }
 
             char *end_ptr = strchr(src, '\n');
+            char *end_ptr2 = strchr(src, '\r');
+            if (end_ptr2 && end_ptr2 < end_ptr)
+                end_ptr = end_ptr2;
             if (end_ptr != NULL) {
                 int url_size = (int)(end_ptr - src) + 1;
                 ms->url = malloc(url_size);
