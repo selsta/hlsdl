@@ -13,6 +13,7 @@
 
 #include "misc.h"
 #include "msg.h"
+#include "hls.h"
 
 static void print_help(const char *filename)
 {
@@ -29,6 +30,7 @@ static void print_help(const char *filename)
            "-n ... Allow to replace part of AES key uri - new.\n"
            "-f ... Force overwriting the output file.\n"
            "-F ... Force ignore detection of DRM.\n"
+           "-K ... Force AES key value (hexstring)\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
            "-t ... Print the links to the .ts files.\n"
@@ -47,7 +49,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbfFctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bvqbfFK:ctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -71,6 +73,13 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'F':
             hls_args.force_ignoredrm = true;
+            break;
+        case 'K':
+            hls_args.key_value = malloc(KEYLEN);
+            if (strlen(optarg) != 2*KEYLEN || str_to_bin(hls_args.key_value, optarg, KEYLEN)) {
+                MSG_ERROR("AES key value : 32 characters hexstring expected\n", c);
+                ret = -1;
+            }
             break;
         case 's':
             hls_args.live_start_offset_sec = atoi(optarg);

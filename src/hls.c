@@ -1631,7 +1631,13 @@ int fill_key_value(struct enc_aes128 *es)
         {
             memcpy(es->key_value, cache_key_value, KEYLEN);
         }
-        else
+        else if (hls_args.key_value)
+        {
+            memcpy(es->key_value, hls_args.key_value, KEYLEN);
+            memcpy(cache_key_value, es->key_value, KEYLEN);
+            free(cache_key_url);
+            cache_key_url = strdup(es->key_url);
+        } else
         {
             char *key_url = NULL;
             char *key_value = NULL;
