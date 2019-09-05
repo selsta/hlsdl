@@ -288,7 +288,6 @@ static pidtype_t get_pid_type(uint16_t pid)
         case PID_PAT:
         case PID_CAT:
         case PID_TSDT:
-        case PID_DVB_NIT:
             pidtype = PT_SECTIONS;
             break;
         case PID_NULL:
