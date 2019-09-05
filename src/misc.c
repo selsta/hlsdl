@@ -28,6 +28,7 @@ static void print_help(const char *filename)
            "-k ... Allow to replace part of AES key uri - old.\n"
            "-n ... Allow to replace part of AES key uri - new.\n"
            "-f ... Force overwriting the output file.\n"
+           "-F ... Force ignore detection of DRM.\n"
            "-q ... Print less to the console.\n"
            "-d ... Print the openssl decryption command.\n"
            "-t ... Print the links to the .ts files.\n"
@@ -46,7 +47,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbfctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bvqbfFctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -67,6 +68,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'f':
             hls_args.force_overwrite = true;
+            break;
+        case 'F':
+            hls_args.force_ignoredrm = true;
             break;
         case 's':
             hls_args.live_start_offset_sec = atoi(optarg);

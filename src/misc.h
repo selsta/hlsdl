@@ -30,6 +30,7 @@ struct hls_args {
     bool use_best;
     int skip_encryption;
     bool force_overwrite;
+    bool force_ignoredrm;
     bool dump_ts_urls;
     bool dump_dec_cmd;
     int live_start_offset_sec;
