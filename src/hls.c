@@ -241,10 +241,8 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
 
     if (!strncmp(tag, "#EXT-X-KEY:METHOD=AES-128", 25)) {
         enc_type = ENC_AES128;
-        me->enc_aes.iv_is_static = false;
     } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
         enc_type = ENC_AES_SAMPLE;
-        me->enc_aes.iv_is_static = true;
     } else  {
         if (!strncmp(tag, "#EXTINF:", 8)){
             ms->duration_ms = get_duration_ms(tag+8);
@@ -272,6 +270,7 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
 
     me->encryption = true;
     me->encryptiontype = enc_type;
+    me->enc_aes.iv_is_static = false;
 
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
