@@ -67,9 +67,6 @@ Ideas
 -----
 
 - Multithreading
-- Remuxing to other formats
-- Livestreams
-- C++ refactor for fun
 
 License
 -------
