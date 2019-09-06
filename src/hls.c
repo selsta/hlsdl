@@ -103,6 +103,11 @@ long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char *
     return http_code;
 }
 
+int is_playlist_FPS(char* source)
+{
+    return strstr(source, "KEYFORMAT=\"com.apple.streamingkeydelivery\"");
+}
+
 int get_playlist_type(char *source)
 {
     if (strncmp("#EXTM3U", source, 7) != 0) {
@@ -114,7 +119,7 @@ int get_playlist_type(char *source)
         return MASTER_PLAYLIST;
     }
 
-    if (!hls_args.force_ignoredrm && strstr(source, "KEYFORMAT=\"com.apple.streamingkeydelivery\"")) {
+    if (!hls_args.force_ignoredrm && is_playlist_FPS(source)) {
         MSG_WARNING("HLS stream is DRM protected. Exiting\n");
         return -1;
     }
@@ -241,8 +246,10 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
 
     if (!strncmp(tag, "#EXT-X-KEY:METHOD=AES-128", 25)) {
         enc_type = ENC_AES128;
+        me->enc_aes.iv_is_static = false;
     } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
         enc_type = ENC_AES_SAMPLE;
+        me->enc_aes.iv_is_static = is_playlist_FPS(me->source);
     } else  {
         if (!strncmp(tag, "#EXTINF:", 8)){
             ms->duration_ms = get_duration_ms(tag+8);
@@ -270,7 +277,6 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
 
     me->encryption = true;
     me->encryptiontype = enc_type;
-    me->enc_aes.iv_is_static = false;
 
     char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
     char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
