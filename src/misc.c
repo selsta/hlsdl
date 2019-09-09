@@ -19,10 +19,10 @@ static void print_help(const char *filename)
 {
     printf("hlsdl v0.26\n");
     printf("(c) 2017-2019 @selsta, samsamsam@o2.pl\n");
-    printf("Usage: %s url [options]\n\n"
-           "-b ... Automaticly choose the best quality.\n"
+    printf("Usage: %s [options] url\n\n"
+           "-b ... Automatically choose the best quality.\n"
            "-v ... Verbose more information.\n"
-           "-o ... Choose name of output file.\n"
+           "-o ... Choose name of output file (\"-\" alias for stdout).\n"
            "-u ... Set custom HTTP User-Agent header.\n"
            "-h ... Set custom HTTP header.\n"
            "-p ... Set proxy uri.\n"

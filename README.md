@@ -19,7 +19,7 @@ https://github.com/selsta/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
 
 Usage and Options
 -----------------
-`./hlsdl url [options]`
+`./hlsdl [options] url`
 
 ---------------------------
 ```
@@ -41,6 +41,10 @@ Usage and Options
 
 -f ... Force overwriting the output file.
 
+-F ... Force ignore detection of DRM.
+
+-K ... Force AES key value (hexstring)
+
 -q ... Print less to the console.
 
 -d ... Print the openssl decryption command.
@@ -56,6 +60,10 @@ Usage and Options
 -w ... Set max download segment retries.
 
 -a ... Set additional url to the audio media playlist.
+
+-c ... Treat HTTP code 206 as 200 even if request was made without range header.
+
+-C ... the file name of file holding cookie data in the old Netscape / Mozilla cookie data format.
 ```
 
 ToDo
