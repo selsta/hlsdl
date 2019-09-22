@@ -12,6 +12,7 @@ Build
 -----
 
 ![Ubuntu build](https://github.com/selsta/hlsdl/workflows/Ubuntu%20build/badge.svg)
+![macOS build](https://github.com/selsta/hlsdl/workflows/macOS%20build/badge.svg)
 
 Linux:
 `make && make install && make clean`
