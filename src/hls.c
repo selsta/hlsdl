@@ -7,7 +7,7 @@
 #include <time.h>
 
 #ifndef _MSC_VER
-#if !defined(__APPLE__) && !defined(__MINGW32__)
+#if !defined(__APPLE__) && !defined(__MINGW32__) && !defined(__CYGWIN__)
 #include <sys/prctl.h>
 #endif
 #include <unistd.h>
