@@ -1157,7 +1157,7 @@ static void *hls_playlist_update_thread(void *arg)
     char threadname[50];
     strncpy(threadname, __func__, sizeof(threadname));
     threadname[49] = '\0';
-#if !defined(__APPLE__) && !defined(__MINGW32__)
+#if !defined(__APPLE__) && !defined(__MINGW32__) && !defined(__CYGWIN__)
     prctl(PR_SET_NAME, (unsigned long)&threadname);
 #endif
 #endif
