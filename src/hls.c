@@ -1511,6 +1511,41 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
     return ret;
 }
 
+bool consecutive_sync_byte(uint8_t *buf, size_t len, uint8_t n) {
+    if (len < n * TS_PACKET_LENGTH) {
+        return false;
+    }
+
+    for (uint8_t i = 1; i < n; ++i) {
+        if (buf[i * TS_PACKET_LENGTH] != TS_SYNC_BYTE) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint8_t * find_first_ts_packet(ByteBuffer_t *buf) {
+    uint8_t *cursor = buf->data;
+    size_t len = buf->len;
+
+    while (TS_PACKET_LENGTH <= len) {
+        uint8_t *next = memchr(cursor, TS_SYNC_BYTE, len);
+        if (next == NULL) {
+            return NULL;
+        }
+        len -= (next - cursor);
+        cursor = next;
+        if (consecutive_sync_byte(cursor, len, 3)) {
+            return cursor;
+        }
+        ++cursor;
+        --len;
+    }
+
+    return NULL;
+}
+
 int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
 {
     MSG_VERBOSE("Downloading segments.\n");
@@ -1543,18 +1578,34 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
             break;
         }
 
-        // first segment should be TS for success merge
-        if (ms_audio && seg.len > TS_PACKET_LENGTH && seg.data[0] == TS_SYNC_BYTE) {
+        uint8_t *first_video_packet = find_first_ts_packet(&seg);
+        uint8_t *first_audio_packet = NULL;
+        if (ms_audio) {
             if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
                 break;
             }
+            first_audio_packet = find_first_ts_packet(&seg_audio);
+        }
 
-            download_size += merge_packets(&merge_context, seg.data, seg.len, seg_audio.data, seg_audio.len);
+        // first segment should be TS for success merge
+        if (first_video_packet && first_audio_packet) {
+            size_t video_len = seg.len - (first_video_packet - seg.data);
+            size_t audio_len = seg_audio.len - (first_audio_packet - seg_audio.data);
 
-            free(seg_audio.data);
-            ms_audio = ms_audio->next;
+            download_size += merge_packets(
+                &merge_context,
+                first_video_packet,
+                video_len,
+                first_audio_packet,
+                audio_len
+            );
         } else {
             download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+        }
+
+        if (ms_audio) {
+            free(seg_audio.data);
+            ms_audio = ms_audio->next;
         }
 
         free(seg.data);
