@@ -11,6 +11,10 @@ jobs:
     - uses: actions/checkout@v1
     - name: make
       run: make
+    - name: download testfile
+      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+    - name: verify testfile
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
 
   build-ubuntu:
 
@@ -24,3 +28,7 @@ jobs:
       run: sudo apt -y install libcurl4-openssl-dev libssl-dev
     - name: make
       run: make
+    - name: download testfile
+      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+    - name: verify testfile
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
