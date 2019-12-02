@@ -7,10 +7,11 @@ OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 
 S_SRC= src/main.c src/aes_openssl.c src/curl.c src/hls.c src/misc.c src/msg.c src/mpegts.c
 ifeq ("$(OSNAME)", "darwin")
+    OPENSSL_MACOS=$(shell brew --prefix openssl)
 	CFLAGS+=-I/usr/local/include/
-	CFLAGS+=-I/usr/local/opt/openssl/include
+	CFLAGS+=-I$(OPENSSL_MACOS)/include
 	LDFLAGS+=-L/usr/local/lib
-	LDFLAGS+=-L/usr/local/opt/openssl/lib
+	LDFLAGS+=-L$(OPENSSL_MACOS)/lib
 else ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
 else ifeq ("$(OSNAME)", "mingw32")
