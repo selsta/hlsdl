@@ -29,6 +29,8 @@ typedef struct ByteBuffer {
 struct hls_args {
     int loglevel;
     bool use_best;
+    int maxwidth;
+    int maxheight;
     int skip_encryption;
     bool force_overwrite;
     bool force_ignoredrm;

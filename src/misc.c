@@ -21,6 +21,8 @@ static void print_help(const char *filename)
     printf("(c) 2017-2019 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s [options] url\n\n"
            "-b ... Automatically choose the best quality.\n"
+           "-W ... Choose largest width lower or equal than this.\n"
+           "-H ... Choose largest ehgith lower or equal than this.\n"
            "-v ... Verbose more information.\n"
            "-o ... Choose name of output file (\"-\" alias for stdout).\n"
            "-u ... Set custom HTTP User-Agent header.\n"
@@ -49,7 +51,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bvqbfFK:ctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:vqbfFK:ctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -61,6 +63,12 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'b':
             hls_args.use_best = true;
+            break;
+        case 'W':
+            hls_args.maxwidth = atoi(optarg);
+            break;
+        case 'H':
+            hls_args.maxheight = atoi(optarg);
             break;
         case 'h':
             if (custom_header_idx < HLSDL_MAX_NUM_OF_CUSTOM_HEADERS) {

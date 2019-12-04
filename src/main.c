@@ -130,6 +130,8 @@ int main(int argc, char *argv[])
     hls_args.live_start_offset_sec = HLSDL_LIVE_START_OFFSET_SEC;
     hls_args.open_max_retries = HLSDL_OPEN_MAX_RETRIES;
     hls_args.refresh_delay_sec = -1;
+    hls_args.maxwidth = -1;
+    hls_args.maxheight = -1;
 
     if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");
@@ -180,6 +182,30 @@ int main(int argc, char *argv[])
                 me = me->next;
             }
             MSG_VERBOSE("Choosing best quality. (Bitrate: %d), (Resolution: %s), (Codecs: %s)\n", selected->bitrate, selected->resolution, selected->codecs);
+        } else if (hls_args.maxwidth > -1 || hls_args.maxheight > -1) {
+            int width, maxwidth = 0;
+            int height, maxheight = 0;
+            hls_media_playlist_t *me;
+	    for (me = master_playlist.media_playlist; me; me = me->next) {
+                if (sscanf(me->resolution, "%dx%d", &width, &height) < 2)
+                    break;
+                if (width > hls_args.maxwidth && hls_args.maxwidth != -1)
+                    continue;
+                if (height > hls_args.maxheight && hls_args.maxheight != -1)
+                    continue;
+                if (selected == NULL ||
+                    ((hls_args.maxwidth == -1 || width > maxwidth) &&
+                     (hls_args.maxheight == -1 || height > maxheight))) {
+                    selected = me;
+                    maxwidth = width;
+                    maxheight = height;
+                }
+            }
+            if (selected == NULL) {
+                MSG_ERROR("No resolution match found\n");
+		exit(1);
+            }
+            MSG_VERBOSE("Choosing by resolution. (Bitrate: %d), (Resolution: %s), (Codecs: %s)\n", selected->bitrate, selected->resolution, selected->codecs);
         } else {
             // print hls master playlist
             int i = 1;
