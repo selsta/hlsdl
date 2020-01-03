@@ -39,7 +39,7 @@ all: $(S_OBJS)
 
 install:
 	mkdir -p $(INSTALL_DIR)
-	install -m 555 $(HLSDL) $(INSTALL_DIR)/$(HLSDL)
+	install -m 755 $(HLSDL) $(INSTALL_DIR)/$(HLSDL)
 
 uninstall:
 	rm -f $(INSTALL_DIR)/$(HLSDL)
