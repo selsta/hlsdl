@@ -14,7 +14,7 @@ ifeq ("$(OSNAME)", "darwin")
 	LDFLAGS+=-L$(OPENSSL_MACOS)/lib
 else ifeq ("$(OSNAME)", "linux")
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99
-else ifeq ("$(OSNAME)", "mingw32")
+else ifneq ($(findstring "$(OSNAME)","mingw32" "mingw64"),)
 	CFLAGS+=-D_GNU_SOURCE=1 -std=gnu99 -DCURL_STATICLIB
 	S_SRC+=msvc/win/memmem.c
 else
@@ -27,8 +27,8 @@ CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=-Wsign-compare -Iincludes
 CFLAGS+=-DPREFIX='"$(PREFIX)"'
 
-ifeq ("$(OSNAME)", "mingw32")
-	LDFLAGS+=-Wl,-Bstatic -lpthread -lcurl  -lssl -lcrypto -lwsock32 -lws2_32 -lwldap32 -lz
+ifneq ($(findstring "$(OSNAME)","mingw32" "mingw64"),)
+	LDFLAGS+=-Wl,-Bstatic -lpthread -lcurl -lnghttp2 -lssh2 -lbrotlidec-static -lbrotlicommon-static -lssl -lcrypto -lcrypt32 -lwsock32 -lws2_32 -lwldap32 -lz
 else
 	LDFLAGS+=-lpthread -lcurl -lcrypto -lssl
 endif
