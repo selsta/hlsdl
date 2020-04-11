@@ -22,7 +22,7 @@ static void print_help(const char *filename)
     printf("Usage: %s [options] url\n\n"
            "-b ... Automatically choose the best quality.\n"
            "-W ... Choose largest width lower or equal than this.\n"
-           "-H ... Choose largest ehgith lower or equal than this.\n"
+           "-H ... Choose largest height lower or equal than this.\n"
            "-v ... Verbose more information.\n"
            "-o ... Choose name of output file (\"-\" alias for stdout).\n"
            "-u ... Set custom HTTP User-Agent header.\n"
