@@ -32,3 +32,16 @@ jobs:
       run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
       run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: numworks/setup-msys2@v1
+    - name: update pacman
+      run: msys2do pacman -Syu --noconfirm
+    - name: install monero dependencies
+      run: msys2do pacman -S --noconfirm mingw-w64-x86_64-toolchain make mingw-w64-x86_64-openssl mingw-w64-x86_64-curl
+    - name: build
+      run: msys2do make
+
