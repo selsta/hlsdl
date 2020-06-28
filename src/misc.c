@@ -4,12 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
-#ifndef _MSC_VER
 #include <unistd.h>
-#else
-#include "..\msvc\win\getopt.h"
-#endif
 
 #include "misc.h"
 #include "msg.h"
