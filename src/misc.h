@@ -54,7 +54,7 @@ struct hls_args {
     bool accept_partial_content;
 };
 
-struct hls_args hls_args;
+extern struct hls_args hls_args;
 
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);

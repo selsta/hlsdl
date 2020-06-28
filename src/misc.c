@@ -15,6 +15,8 @@
 #include "msg.h"
 #include "hls.h"
 
+struct hls_args hls_args;
+
 static void print_help(const char *filename)
 {
     printf("hlsdl v0.27\n");
