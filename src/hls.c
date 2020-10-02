@@ -943,7 +943,7 @@ static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out,
 
         // to check if I did not any mistake in offset calculation
         if (size > in->pos) {
-            MSG_ERROR("NAL size after decryption is grater then before - before: %d, after: %d - should never happen!\n", size);
+            MSG_ERROR("NAL size after decryption is grater then before - before: %d, after: %d - should never happen!\n", size, in->pos);
             exit(-1);
         }
 
