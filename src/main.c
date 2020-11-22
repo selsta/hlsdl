@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
     hls_args.refresh_delay_sec = -1;
     hls_args.maxwidth = -1;
     hls_args.maxheight = -1;
+    hls_args.audiolang = NULL;
 
     if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");
@@ -263,8 +264,28 @@ int main(int argc, char *argv[])
                 int i = 1;
 
                 if (!selected_audio) {
-                    if (!hls_args.use_best) {
+                    if (hls_args.use_best || hls_args.audiolang) {
+                        i = 0;
                         audio = master_playlist.audio;
+                        while (audio) {
+                            if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
+                                i += 1;
+                                if (hls_args.use_best && audio->is_default) {
+                                    audio_choice = i;
+                                    break;
+                                }
+                                if (hls_args.audiolang && audio->lang && 0 == strcmp(audio->lang, hls_args.audiolang)) {
+                                    audio_choice = i;
+                                    break;
+                                }
+                            }
+                            audio = audio->next;
+                        }
+                    }
+
+                    if (audio_choice == 0) {
+                        audio = master_playlist.audio;
+                        i = 0;
                         while (audio) {
                             if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
                                 MSG_PRINT("%d: Name: %s, Language: %s\n", i, audio->name, audio->lang ? audio->lang : "unknown");
@@ -277,18 +298,6 @@ int main(int argc, char *argv[])
                         if (scanf("%d", &audio_choice) != 1 || audio_choice <= 0 || audio_choice >= i) {
                             MSG_ERROR("Wrong input!\n");
                             exit(1);
-                        }
-                    } else {
-                        audio_choice = 1;
-                        i = 0;
-                        audio = master_playlist.audio;
-                        while (audio) {
-                            if (0 == strcmp(audio->grp_id, selected->audio_grp) && audio->is_default) {
-                                i += 1;
-                                audio_choice = i;
-                                break;
-                            }
-                            audio = audio->next;
                         }
                     }
 

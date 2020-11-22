@@ -31,6 +31,7 @@ struct hls_args {
     bool use_best;
     int maxwidth;
     int maxheight;
+    char *audiolang;
     int skip_encryption;
     bool force_overwrite;
     bool force_ignoredrm;
