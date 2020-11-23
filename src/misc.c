@@ -40,6 +40,7 @@ static void print_help(const char *filename)
            "-d ... Print the openssl decryption command.\n"
            "-t ... Print the links to the .ts files.\n"
            "-s ... Set live start offset in seconds.\n"
+           "-i ... Set live stream download duration in seconds.\n"
            "-e ... Set refresh delay in seconds.\n"
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
@@ -54,7 +55,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -97,6 +98,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 's':
             hls_args.live_start_offset_sec = atoi(optarg);
+            break;
+        case 'i':
+            hls_args.live_duration_sec = atoi(optarg);
             break;
         case 'e':
             hls_args.refresh_delay_sec = atoi(optarg);

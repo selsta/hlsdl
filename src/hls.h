@@ -22,6 +22,7 @@ extern "C" {
 #define HLSDL_MIN_REFRESH_DELAY_SEC    0
 #define HLSDL_MAX_REFRESH_DELAY_SEC    5
 #define HLSDL_LIVE_START_OFFSET_SEC  120
+#define HLSDL_LIVE_DURATION         (-1)
 #define HLSDL_MAX_RETRIES             30
 #define HLSDL_OPEN_MAX_RETRIES         3
 

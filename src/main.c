@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
     hls_args.loglevel = 0;
     hls_args.segment_download_retries = HLSDL_MAX_RETRIES;
     hls_args.live_start_offset_sec = HLSDL_LIVE_START_OFFSET_SEC;
+    hls_args.live_duration_sec = HLSDL_LIVE_DURATION;
     hls_args.open_max_retries = HLSDL_OPEN_MAX_RETRIES;
     hls_args.refresh_delay_sec = -1;
     hls_args.maxwidth = -1;
