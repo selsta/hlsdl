@@ -35,7 +35,9 @@ else
 endif
 
 
-all: $(S_OBJS)
+all: $(HLSDL)
+
+hlsdl: $(S_OBJS)
 	$(CC) $(S_OBJS) $(LDFLAGS) -o $(HLSDL)
 
 install:
