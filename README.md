@@ -28,6 +28,12 @@ Usage and Options
 ```
 -b ... Automatically choose the best quality.
 
+-W ... Choose largest width lower or equal than this.
+
+-H ... Choose largest height lower or equal than this.
+
+-A ... Select audio language.
+
 -v ... Verbose more information.
 
 -o ... Choose name of output file ("-" alias for stdout).
@@ -55,6 +61,8 @@ Usage and Options
 -t ... Print the links to the .ts files.
 
 -s ... Set live start offset in seconds.
+
+-i ... Set live stream download duration in seconds.
 
 -e ... Set refresh delay in seconds.
 
