@@ -188,7 +188,7 @@ int main(int argc, char *argv[])
             int width, maxwidth = 0;
             int height, maxheight = 0;
             hls_media_playlist_t *me;
-	    for (me = master_playlist.media_playlist; me; me = me->next) {
+            for (me = master_playlist.media_playlist; me; me = me->next) {
                 if (sscanf(me->resolution, "%dx%d", &width, &height) < 2)
                     break;
                 if (width > hls_args.maxwidth && hls_args.maxwidth != -1)
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
             }
             if (selected == NULL) {
                 MSG_ERROR("No resolution match found\n");
-		exit(1);
+                exit(1);
             }
             MSG_VERBOSE("Choosing by resolution. (Bitrate: %d), (Resolution: %s), (Codecs: %s)\n", selected->bitrate, selected->resolution, selected->codecs);
         } else {
