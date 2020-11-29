@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
                         }
 
                         MSG_PRINT("Which Language should be downloaded? ");
-                        if (scanf("%d", &audio_choice) != 1 || audio_choice <= 0 || audio_choice >= i) {
+                        if (scanf("%d", &audio_choice) != 1 || audio_choice < 0 || audio_choice >= i) {
                             MSG_ERROR("Wrong input!\n");
                             exit(1);
                         }
@@ -306,11 +306,12 @@ int main(int argc, char *argv[])
                     audio = master_playlist.audio;
                     while (audio) {
                         if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                            i += 1;
+                           
                             if (i == audio_choice) {
                                 selected_audio = audio;
                                 break;
                             }
+                            i += 1;
                         }
                         audio = audio->next;
                     }

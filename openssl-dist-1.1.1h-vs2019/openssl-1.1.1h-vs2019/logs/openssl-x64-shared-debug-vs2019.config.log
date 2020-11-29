@@ -1,0 +1,20 @@
+Configured with: perl C:\work\hlsdl\openssl-1.1.1h\Configure debug-VC-WIN64A enable-static-engine --prefix=C:\work\hlsdl\openssl-dist-1.1.1h-vs2019\openssl-x64-shared-debug-vs2019 --openssldir=./ssl shared no-asm  
+Configuring OpenSSL version 1.1.1h (0x1010108fL) for debug-VC-WIN64A
+Using os-specific seed configuration
+Creating configdata.pm
+Creating makefile
+
+**********************************************************************
+***                                                                ***
+***   OpenSSL has been successfully configured                     ***
+***                                                                ***
+***   If you encounter a problem while building, please open an    ***
+***   issue on GitHub <https://github.com/openssl/openssl/issues>  ***
+***   and include the output from the following command:           ***
+***                                                                ***
+***       perl configdata.pm --dump                                ***
+***                                                                ***
+***   (If you are new to OpenSSL, you might want to consult the    ***
+***   'Troubleshooting' section in the INSTALL file first)         ***
+***                                                                ***
+**********************************************************************

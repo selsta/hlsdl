@@ -1,0 +1,133 @@
+.TH hlsdl 1 "Nov 25, 2020"
+
+.
+.
+.
+.SH NAME
+hlsdl - download VoD HLS (.m3u8) files
+
+.
+.
+.
+.SH DESCRIPTION
+
+hlsdl downloads .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to
+a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
+It requires the libcurl and libcrypto libraries.
+
+.
+.
+.
+.SH OPTIONS
+
+.TP
+.B
+-b 
+Automatically choose the best quality.
+.TP
+.B
+-W 
+Choose largest width lower or equal than this.
+.TP
+.B
+-H 
+Choose largest height lower or equal than this.
+.TP
+.B
+-A 
+Select audio language.
+.TP
+.B
+-v 
+Verbose more information.
+.TP
+.B
+-o 
+Choose name of output file ("-" alias for stdout).
+.TP
+.B
+-u 
+Set custom HTTP User-Agent header.
+.TP
+.B
+-h 
+Set custom HTTP header.
+.TP
+.B
+-p 
+Set proxy uri.
+.TP
+.B
+-k 
+Allow to replace part of AES key uri - old.
+.TP
+.B
+-n 
+Allow to replace part of AES key uri - new.
+.TP
+.B
+-f 
+Force overwriting the output file.
+.TP
+.B
+-F 
+Force ignore detection of DRM.
+.TP
+.B
+-K 
+Force AES key value (hexstring)
+.TP
+.B
+-q 
+Print less to the console.
+.TP
+.B
+-d 
+Print the openssl decryption command.
+.TP
+.B
+-t 
+Print the links to the .ts files.
+.TP
+.B
+-s 
+Set live start offset in seconds.
+.TP
+.B
+-i 
+Set live stream download duration in seconds.
+.TP
+.B
+-e 
+Set refresh delay in seconds.
+.TP
+.B
+-r 
+Set max retries at open.
+.TP
+.B
+-w 
+Set max download segment retries.
+.TP
+.B
+-a 
+Set additional url to the audio media playlist.
+.TP
+.B
+-c 
+Treat HTTP code 206 as 200 even if request was made without range header.
+.TP
+.B
+-C 
+The file name of file holding cookie data in the old Netscape / Mozilla cookie
+data format.
+
+.
+.
+.
+.SH SOURCE
+
+https://github.com/selsta/hlsdl
+
+
+

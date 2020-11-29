@@ -19,8 +19,8 @@ struct hls_args hls_args;
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.27\n");
-    printf("(c) 2017-2020 @selsta, samsamsam@o2.pl\n");
+    printf("hlsdl v0.28\n");
+    printf("(c) 2017-2020 @selsta, samsamsam@o2.pl, @xavave\n");
     printf("Usage: %s [options] url\n\n"
            "-b ... Automatically choose the best quality.\n"
            "-W ... Choose largest width lower or equal than this.\n"

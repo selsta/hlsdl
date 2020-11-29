@@ -1,0 +1,25 @@
+######################################################################
+# Install utilities
+######################################################################
+git:
+https://git-scm.com/download/win
+
+Visual Studio 2019:
+https://visualstudio.microsoft.com/downloads/
+    community 
+        C++
+
+vcpkg:
+ https://github.com/microsoft/vcpkg
+
+######################################################################
+# Download & Build
+######################################################################
+
+# clone hlsdl
+git clone https://github.com/xavave/hlsdl.git
+
+#After download with git, refer to screenshots in included Folder HowTo_VisualStudio2019_Win10x64
+
+# Open project solution hlsdl.sln
+

@@ -120,8 +120,8 @@ int get_playlist_type(char *source)
     }
 
     if (!hls_args.force_ignoredrm && is_playlist_FPS(source)) {
-        MSG_WARNING("HLS stream is DRM protected. Exiting\n");
-        return -1;
+        MSG_WARNING("HLS stream is DRM protected.\n");
+        //return -1;
     }
 
     return MEDIA_PLAYLIST;
@@ -942,10 +942,10 @@ static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out,
         int size = sample_aes_decrypt_nal_units(s, in->data + pes_header_size, in->pos - pes_header_size) + pes_header_size;
 
         // to check if I did not any mistake in offset calculation
-        if (size > in->pos) {
-            MSG_ERROR("NAL size after decryption is grater then before - before: %d, after: %d - should never happen!\n", size, in->pos);
+       /* if (size > in->pos) {
+            MSG_ERROR("NAL size after decryption is greater then before - before: %d, after: %d - should never happen!\n", size, in->pos);
             exit(-1);
-        }
+        }*/
 
         // output size could be less then input because the start code emulation prevention could be removed if available
         if (size < in->pos) {
