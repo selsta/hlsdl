@@ -9,6 +9,17 @@ hlsdl - download VoD HLS (.m3u8) files
 .
 .
 .
+.SH SYNOPSIS
+
+.B
+hlsdl
+[\fIoptions\fP]
+.I
+url
+
+.
+.
+.
 .SH DESCRIPTION
 
 hlsdl downloads .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to
@@ -25,61 +36,55 @@ It requires the libcurl and libcrypto libraries.
 -b 
 Automatically choose the best quality.
 .TP
-.B
--W 
+.BI -W " width
 Choose largest width lower or equal than this.
 .TP
-.B
--H 
+.BI -H " height
 Choose largest height lower or equal than this.
 .TP
-.B
--A 
+.BI -A " language
 Select audio language.
 .TP
 .B
 -v 
-Verbose more information.
+Verbose more information. Repeating this option increases verbosity each time.
 .TP
-.B
--o 
-Choose name of output file ("-" alias for stdout).
+.BI -o " file
+Name of output file ("-" alias for stdout).
 .TP
-.B
--u 
+.BI -u " user_agent
 Set custom HTTP User-Agent header.
 .TP
-.B
--h 
-Set custom HTTP header.
+.BI -h " header
+Add a custom HTTP header. This option can be applied multiple times to adds
+multiple HTTP header lines.
 .TP
-.B
--p 
+.BI -p " url
 Set proxy uri.
 .TP
-.B
--k 
-Allow to replace part of AES key uri - old.
+.BI -k " old
+.sp -1
 .TP
-.B
--n 
-Allow to replace part of AES key uri - new.
+.BI -n " new
+Replace every occurence of the string \fIold\fP with \fInew\fP in the
+AES key uri.
 .TP
 .B
 -f 
-Force overwriting the output file.
+Overwrite the output file without asking.
 .TP
 .B
 -F 
 Force ignore detection of DRM.
 .TP
-.B
--K 
-Force AES key value (hexstring)
+.BI -K " key
+Use \fIkey\fP in place of the AES key value found from the url.
+The key is a string of 32 hexadecimal characters, with no hyphen in between.
 .TP
 .B
 -q 
-Print less to the console.
+Print less to the console. This option decreases the verbosity level each time
+is given. It is the opposite of \fI-v\fP.
 .TP
 .B
 -d 
@@ -89,38 +94,30 @@ Print the openssl decryption command.
 -t 
 Print the links to the .ts files.
 .TP
-.B
--s 
+.BI -s " seconds
 Set live start offset in seconds.
 .TP
-.B
--i 
+.BI -i " seconds
 Set live stream download duration in seconds.
 .TP
-.B
--e 
+.BI -e " seconds
 Set refresh delay in seconds.
 .TP
-.B
--r 
+.BI -r " number
 Set max retries at open.
 .TP
-.B
--w 
+.BI -w " number
 Set max download segment retries.
 .TP
-.B
--a 
+.BI -a " url
 Set additional url to the audio media playlist.
 .TP
 .B
 -c 
 Treat HTTP code 206 as 200 even if request was made without range header.
 .TP
-.B
--C 
-The file name of file holding cookie data in the old Netscape / Mozilla cookie
-data format.
+.BI -C " file
+The file holding cookie data in the old Netscape / Mozilla cookie data format.
 
 .
 .
@@ -128,6 +125,4 @@ data format.
 .SH SOURCE
 
 https://github.com/selsta/hlsdl
-
-
 
