@@ -3,6 +3,8 @@ CC?=gcc
 PREFIX?=/usr/local
 HLSDL=hlsdl
 INSTALL_DIR=$(PREFIX)/bin
+MAN=hlsdl.1
+INSTALL_DIR_MAN=$(PREFIX)/man/man1
 OSNAME=$(shell uname -s | sed -e 's/[-_].*//g' | tr A-Z a-z)
 
 S_SRC= src/main.c src/aes_openssl.c src/curl.c src/hls.c src/misc.c src/msg.c src/mpegts.c
@@ -43,6 +45,8 @@ hlsdl: $(S_OBJS)
 install:
 	mkdir -p $(INSTALL_DIR)
 	install -m 755 $(HLSDL) $(INSTALL_DIR)/$(HLSDL)
+	mkdir -p $(INSTALL_DIR_MAN)
+	cp $(MAN) $(INSTALL_DIR_MAN)
 
 uninstall:
 	rm -f $(INSTALL_DIR)/$(HLSDL)
