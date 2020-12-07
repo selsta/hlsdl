@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
                         selected_audio = audio;
                     }
                 }
+                audio = audio->next;
             }
 
             if (has_audio_playlist) {
