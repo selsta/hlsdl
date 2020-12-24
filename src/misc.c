@@ -42,6 +42,7 @@ static void print_help(const char *filename)
            "-t ... Print the links to the .ts files.\n"
            "-s ... Set live start offset in seconds.\n"
            "-i ... Set live stream download duration in seconds.\n"
+           "-I ... Ignore HTTP errors.\n"
            "-e ... Set refresh delay in seconds.\n"
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
@@ -56,7 +57,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:mu:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:mu:h:s:i:Ir:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -120,6 +121,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 't':
             hls_args.dump_ts_urls = true;
+            break;
+        case 'I':
+            hls_args.ignore_http_errors = true;
             break;
         case 'd':
             hls_args.dump_dec_cmd = true;
@@ -285,7 +289,7 @@ FILE* get_output_file(char prefix[])
             strncat(filename, default_filename, strlen(default_filename));
         }
 
-        MSG_API("Using output filename: %s\n", filename);
+        MSG_DBG("Using output filename: %s\n", filename);
 
         if (is_file_exists(filename)) {
             if (hls_args.force_overwrite) {

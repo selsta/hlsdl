@@ -38,6 +38,7 @@ struct hls_args {
     bool dump_ts_urls;
     bool dump_dec_cmd;
     bool skip_merge;
+    bool ignore_http_errors;
     int live_start_offset_sec;
     int live_duration_sec;
     int refresh_delay_sec;
