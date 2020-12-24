@@ -1,3 +1,4 @@
+#include <libgen.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -279,15 +280,19 @@ FILE* get_output_file(char prefix[])
         fflush(stdout);
     } else {
         char filename[MAX_FILENAME_LEN + strlen(prefix) + 1];
-        strcpy(filename, prefix);
+        char *file_basename = NULL;
+        file_basename = (char *) malloc(MAX_FILENAME_LEN + strlen(prefix) + 1);
 
         if (hls_args.filename) {
-            strncat(filename, hls_args.filename, strlen(hls_args.filename));
+            strcpy(filename, dirname(hls_args.filename));
+            strcat(filename, "/");
+            basename_r(hls_args.filename, file_basename);
+        } else {
+            basename_r("hls_output.ts", file_basename);
         }
-        else {
-            char default_filename[] = "hls_output.ts";
-            strncat(filename, default_filename, strlen(default_filename));
-        }
+
+        strncat(filename, prefix, strlen(prefix));
+        strncat(filename, file_basename, strlen(file_basename));
 
         MSG_DBG("Using output filename: %s\n", filename);
 
