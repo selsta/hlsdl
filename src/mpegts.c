@@ -511,7 +511,7 @@ static bool merge_pmt(const pmt_data_t *pmt1, const pmt_data_t *pmt2, pmt_data_t
 
     if (pmt1->program != pmt2->program)
     {
-        MSG_WARNING("Diffrent program ids %04x != %04x!!!\n", (uint32_t)pmt1->program, (uint32_t)pmt2->program);
+        MSG_WARNING("Different program ids %04x != %04x!!!\n", (uint32_t)pmt1->program, (uint32_t)pmt2->program);
         //return false;
     }
 

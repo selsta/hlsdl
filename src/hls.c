@@ -110,18 +110,18 @@ int is_playlist_FPS(char* source)
 
 int get_playlist_type(char *source)
 {
-    if (strncmp("#EXTM3U", source, 7) != 0) {
+    if (source && strncmp("#EXTM3U", source, 7) != 0) {
         MSG_WARNING("Not a valid M3U8 file. Exiting.\n");
         return -1;
     }
 
-    if (strstr(source, "#EXT-X-STREAM-INF")) {
+    if (source && strstr(source, "#EXT-X-STREAM-INF")) {
         return MASTER_PLAYLIST;
     }
 
     if (!hls_args.force_ignoredrm && is_playlist_FPS(source)) {
         MSG_WARNING("HLS stream is DRM protected.\n");
-        //return -1;
+        return -1;
     }
 
     return MEDIA_PLAYLIST;
@@ -297,6 +297,11 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
 
         free(me->enc_aes.key_url);
         me->enc_aes.key_url = strdup(link_to_key);
+    }
+    else
+    {
+        me->enc_aes.iv_is_static = is_playlist_FPS(me->source);
+
     }
     free(link_to_key);
     return 0;
@@ -942,10 +947,10 @@ static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out,
         int size = sample_aes_decrypt_nal_units(s, in->data + pes_header_size, in->pos - pes_header_size) + pes_header_size;
 
         // to check if I did not any mistake in offset calculation
-       /* if (size > in->pos) {
-            MSG_ERROR("NAL size after decryption is greater then before - before: %d, after: %d - should never happen!\n", size, in->pos);
+        if (size > in->pos) {
+            MSG_ERROR("NAL size after decryption is grater then before - before: %d, after: %d - should never happen!\n", size, in->pos);
             exit(-1);
-        }*/
+        }
 
         // output size could be less then input because the start code emulation prevention could be removed if available
         if (size < in->pos) {

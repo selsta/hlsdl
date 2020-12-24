@@ -19,8 +19,8 @@ struct hls_args hls_args;
 
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.28\n");
-    printf("(c) 2017-2020 @selsta, samsamsam@o2.pl, @xavave\n");
+    printf("hlsdl v0.27\n");
+    printf("(c) 2017-2020 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s [options] url\n\n"
            "-b ... Automatically choose the best quality.\n"
            "-W ... Choose largest width lower or equal than this.\n"
@@ -158,14 +158,12 @@ int parse_argv(int argc, char * const argv[])
     return 1;
 }
 
-int str_to_bin(uint8_t *data, char *hexstring, int len)
+int str_to_bin(uint8_t* data, char* hexstring, int len)
 {
-    char *pos = hexstring;
-
-    for (int count = 0; count < len; count++) {
-        char buf[3] = {pos[0], pos[1], 0};
-        data[count] = (uint8_t)strtol(buf, NULL, 16);
-        pos += 2;
+    char* pos = hexstring;
+    uint8_t str_len = strlen(hexstring);
+    for (int i = 0; i < (str_len / 2); i++) {
+        sscanf(hexstring + 2 * i, "%02x", &data[i]);
     }
     return 0;
 }
