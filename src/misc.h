@@ -37,6 +37,7 @@ struct hls_args {
     bool force_ignoredrm;
     bool dump_ts_urls;
     bool dump_dec_cmd;
+    bool skip_merge;
     int live_start_offset_sec;
     int live_duration_sec;
     int refresh_delay_sec;
@@ -60,6 +61,9 @@ extern struct hls_args hls_args;
 
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);
+FILE* get_output_file(void);
+size_t priv_write(const uint8_t *data, size_t len, void *opaque);
+bool is_file_exists(const char *filename);
 
 char *repl_str(const char *str, const char *from, const char *to);
 

@@ -1551,7 +1551,7 @@ uint8_t * find_first_ts_packet(ByteBuffer_t *buf) {
     return NULL;
 }
 
-int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
+int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio, bool merge)
 {
     MSG_VERBOSE("Downloading segments.\n");
     MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
@@ -1567,6 +1567,16 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     int64_t download_size = 0;
     struct ByteBuffer seg;
     struct ByteBuffer seg_audio;
+
+    FILE *out_file = get_output_file();
+    if (!out_file) {
+        MSG_ERROR("Failed to open output file!\n");
+        return -1;
+    }
+
+    write_ctx_t out_ctx_ = {priv_write, out_file};
+    write_ctx_t *out_ctx = &out_ctx_;
+    // fclose(out_file);
 
     struct hls_media_segment *ms = me->first_media_segment;
     struct hls_media_segment *ms_audio = NULL;
