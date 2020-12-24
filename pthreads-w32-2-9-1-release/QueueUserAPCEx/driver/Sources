@@ -1,0 +1,5 @@
+TARGETNAME=alertdrv
+TARGETPATH=.
+TARGETTYPE=DRIVER
+
+SOURCES=alertdrv.c alertdrv.rc

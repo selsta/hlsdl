@@ -44,32 +44,32 @@
     <ProjectGuid>{30293E02-DC2C-4BA4-B8F4-FE4545E17ADE}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>hlsdl</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_MD|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_MT|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_MD|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_MT|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -132,12 +132,12 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\..\pthreads-w32-2-9-1-release\Pre-built.2\include;..\..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\include;..\..\openssl-1.1.0f-vs2017\include64;..\msvc\win;..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\pthreads-w32-2-9-1-release\Pre-built.2\include;..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\include;..\openssl-dist-1.1.1h-vs2019\openssl-1.1.1h-vs2019\include64;..\msvc\win;..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\lib;..\..\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64;..\..\openssl-1.1.0f-vs2017\lib64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\lib;..\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64;..\openssl-dist-1.1.1h-vs2019\openssl-1.1.1h-vs2019\lib64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib;libcryptoMDd.lib;libcurl_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -184,12 +184,15 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>..\..\openssl-1.1.0f-vs2017\lib64;..\..\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64;..\..\curl\builds\libcurl-vc-x64-release-static-ssl-static-ipv6-sspi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\openssl-dist-1.1.1h-vs2019\openssl-1.1.1h-vs2019\lib64;..\pthreads-w32-2-9-1-release\Pre-built.2\lib\x64;..\curl\builds\libcurl-vc-x64-release-static-ssl-static-ipv6-sspi\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2MT.lib;libcryptoMT.lib;libsslMT.lib;libcurl_a.lib;gdi32.lib;user32.lib;crypt32.lib;wldap32.lib;ws2_32.lib;normaliz.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <PreventDllBinding>
       </PreventDllBinding>
       <AdditionalOptions>/NODEFAULTLIB:LIBCMT</AdditionalOptions>
     </Link>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

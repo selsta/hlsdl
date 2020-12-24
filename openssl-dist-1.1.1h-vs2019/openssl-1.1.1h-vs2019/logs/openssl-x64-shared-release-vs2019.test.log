@@ -1,0 +1,182 @@
+
+Microsoft (R) Program Maintenance Utility Version 14.28.29333.0
+Copyright (C) Microsoft Corporation. Tous droits réservés.
+
+	"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29333\bin\HostX64\x64\nmake.exe" /                   depend && "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29333\bin\HostX64\x64\nmake.exe" /                   _tests
+
+Microsoft (R) Program Maintenance Utility Version 14.28.29333.0
+Copyright (C) Microsoft Corporation. Tous droits réservés.
+
+
+Microsoft (R) Program Maintenance Utility Version 14.28.29333.0
+Copyright (C) Microsoft Corporation. Tous droits réservés.
+
+	mkdir .\test\test-runs
+	set SRCTOP=..\..\openssl-1.1.1h
+	set BLDTOP=.
+	set RESULT_D=.\test\test-runs
+	set PERL=C:\Perl64\bin\perl.exe
+	set OPENSSL_ENGINES=C:\work\hlsdl\openssl-build-1.1.1h-vs2019\openssl-x64-shared-release-vs2019\engines
+	set OPENSSL_DEBUG_MEMORY=on
+	"C:\Perl64\bin\perl.exe" "..\..\openssl-1.1.1h\test\run_tests.pl" 
+..\..\openssl-1.1.1h\test\recipes\01-test_abort.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\01-test_sanity.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\01-test_symbol_presence.t .......... ok
+..\..\openssl-1.1.1h\test\recipes\01-test_test.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\02-test_errstr.t ................... skipped: This is unsupported on MSYS/MinGW or MSWin32
+..\..\openssl-1.1.1h\test\recipes\02-test_internal_ctype.t ........... ok
+..\..\openssl-1.1.1h\test\recipes\02-test_lhash.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\02-test_ordinals.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\02-test_stack.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\03-test_exdata.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_asn1.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_chacha.t .......... ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_curve448.t ........ ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_ec.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_mdc2.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_modes.t ........... ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_poly1305.t ........ ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_siphash.t ......... ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_sm2.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_sm4.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_ssl_cert_table.t .. ok
+..\..\openssl-1.1.1h\test\recipes\03-test_internal_x509.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\03-test_ui.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\04-test_asn1_decode.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\04-test_asn1_encode.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\04-test_asn1_string_table.t ........ ok
+..\..\openssl-1.1.1h\test\recipes\04-test_bio_callback.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\04-test_bioprint.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\04-test_err.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\04-test_pem.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_bf.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_cast.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_cmac.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_des.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_hmac.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_idea.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_md2.t ...................... skipped: md2 is not supported by this OpenSSL build
+..\..\openssl-1.1.1h\test\recipes\05-test_mdc2.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_rand.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_rc2.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_rc4.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\05-test_rc5.t ...................... skipped: rc5 is not supported by this OpenSSL build
+..\..\openssl-1.1.1h\test\recipes\06-test-rdrand.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\10-test_bn.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\10-test_exp.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_dh.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_dsa.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_ec.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_ecdsa.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_ecparam.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\15-test_genec.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_genrsa.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_mp_rsa.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_out_option.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_rsa.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\15-test_rsapss.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\20-test_dgst.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\20-test_enc.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\20-test_enc_more.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\20-test_passwd.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_crl.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_d2i.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_pkcs7.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_req.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_sid.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_verify.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\25-test_x509.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\30-test_afalg.t .................... skipped: test_afalg not supported for this build
+..\..\openssl-1.1.1h\test\recipes\30-test_engine.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\30-test_evp.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\30-test_evp_extra.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\30-test_pbelu.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\30-test_pkey_meth.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\30-test_pkey_meth_kdf.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\40-test_rehash.t ................... skipped: test_rehash is not available on this platform
+..\..\openssl-1.1.1h\test\recipes\60-test_x509_check_cert_pkey.t ..... ok
+..\..\openssl-1.1.1h\test\recipes\60-test_x509_dup_cert.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\60-test_x509_store.t ............... skipped: test_rehash is not available on this platform
+..\..\openssl-1.1.1h\test\recipes\60-test_x509_time.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\70-test_asyncio.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\70-test_bad_dtls.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\70-test_clienthello.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\70-test_comp.t ..................... skipped: test_comp needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_key_share.t ................ skipped: test_key_share needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_packet.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\70-test_recordlen.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\70-test_renegotiation.t ............ skipped: test_renegotiation needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_servername.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\70-test_sslcbcpadding.t ............ skipped: test_sslcbcpadding needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslcertstatus.t ............ skipped: test_sslcertstatus needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslextension.t ............. skipped: test_sslextension needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslmessages.t .............. skipped: test_sslmessages needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslrecords.t ............... skipped: test_sslrecords needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslsessiontick.t ........... skipped: test_sslsessiontick needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslsigalgs.t ............... skipped: test_sslsigalgs needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslsignature.t ............. skipped: test_sslsignature needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslskewith0p.t ............. skipped: test_sslskewith0p needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslversions.t .............. skipped: test_sslversions needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_sslvertol.t ................ skipped: test_sslextension needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13alerts.t .............. skipped: test_tls13alerts needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13cookie.t .............. skipped: test_tls13cookie needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13downgrade.t ........... skipped: test_tls13downgrade needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13hrr.t ................. skipped: test_tls13hrr needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13kexmodes.t ............ skipped: test_tls13kexmodes needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13messages.t ............ skipped: test_tls13messages needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tls13psk.t ................. skipped: test_tls13psk needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_tlsextms.t ................. skipped: test_tlsextms needs the dynamic engine feature enabled
+..\..\openssl-1.1.1h\test\recipes\70-test_verify_extra.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\70-test_wpacket.t .................. skipped: Test disabled in this configuration
+..\..\openssl-1.1.1h\test\recipes\80-test_ca.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_cipherbytes.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_cipherlist.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_ciphername.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_cms.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_cmsapi.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_ct.t ....................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_dane.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_dtls.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_dtls_mtu.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_dtlsv1listen.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_ocsp.t ..................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_pkcs12.t ................... skipped: Win32::API unavailable
+..\..\openssl-1.1.1h\test\recipes\80-test_ssl_new.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_ssl_old.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_ssl_test_ctx.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\80-test_sslcorrupt.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_tsa.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\80-test_x509aux.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_asn1_time.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\90-test_async.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_bio_enc.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_bio_memleak.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_constant_time.t ............ ok
+..\..\openssl-1.1.1h\test\recipes\90-test_fatalerr.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_gmdiff.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_gost.t ..................... skipped: GOST support is disabled in this OpenSSL build
+..\..\openssl-1.1.1h\test\recipes\90-test_ige.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_includes.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_memleak.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_overhead.t ................. skipped: Only supported in no-shared builds
+..\..\openssl-1.1.1h\test\recipes\90-test_secmem.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_shlibload.t ................ ok
+..\..\openssl-1.1.1h\test\recipes\90-test_srp.t ...................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_sslapi.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_sslbuffers.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_store.t .................... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_sysdefault.t ............... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_threads.t .................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_time_offset.t .............. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_tls13ccs.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_tls13encryption.t .......... ok
+..\..\openssl-1.1.1h\test\recipes\90-test_tls13secrets.t ............. ok
+..\..\openssl-1.1.1h\test\recipes\90-test_v3name.t ................... ok
+..\..\openssl-1.1.1h\test\recipes\95-test_external_boringssl.t ....... skipped: No external tests in this configuration
+..\..\openssl-1.1.1h\test\recipes\95-test_external_krb5.t ............ skipped: No external tests in this configuration
+..\..\openssl-1.1.1h\test\recipes\95-test_external_pyca.t ............ skipped: No external tests in this configuration
+..\..\openssl-1.1.1h\test\recipes\99-test_ecstress.t ................. ok
+..\..\openssl-1.1.1h\test\recipes\99-test_fuzz.t ..................... ok
+All tests successful.
+Files=158, Tests=2351, 411 wallclock secs ( 0.92 usr +  0.45 sys =  1.38 CPU)
+Result: PASS
