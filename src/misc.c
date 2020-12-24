@@ -286,9 +286,9 @@ FILE* get_output_file(char prefix[])
         if (hls_args.filename) {
             strcpy(filename, dirname(hls_args.filename));
             strcat(filename, "/");
-            basename_r(hls_args.filename, file_basename);
+            strcpy(file_basename, basename(hls_args.filename));
         } else {
-            basename_r("hls_output.ts", file_basename);
+            strcpy(file_basename, "hls_output.ts");
         }
 
         strncat(filename, prefix, strlen(prefix));
