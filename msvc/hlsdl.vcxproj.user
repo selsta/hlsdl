@@ -4,8 +4,7 @@
     <LocalDebuggerEnvironment>PATH=..\..\openssl-dist-1.1.1h-vs2019\openssl-1.1.1h-vs2019\bin64;..\..\curl\builds\libcurl-vc-x64-debug-dll-ssl-dll-ipv6-sspi\bin;..\..\pthreads-w32-2-9-1-release\Pre-built.2\dll\x64;%PATH%
 $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>
-    </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-v -v -v -v -v -F   -h"Referer: https://www.filmotv.fr/" -h"Origin: https://www.filmotv.fr" -h"Authorization: id_prog=6415&amp;token=a43f03c6-f55e-3784-3d3b-a6a44de43344&amp;drm=widevine&amp;type=streaming&amp;cert=zgHwD2umFWCbwhEXqrs_L3pwuYUj1flYI4OUSw2pv5T7D-umYtNgtqbft-U43Q3avmcFBvfjHQx1E1OGVfFszHS0OOn2od9iJcH_p3jxXVzs2n8pY4wQ3lB0T7GZN5utTdF-FoAhqt9rZUVgb6VlwOQZ2Akwv-h3tSjgw7sH3DJVzm3XJnGfJ49MzDKydRWd_Ow4AHfsbZV8MEYWhIJiETxxED1ev0WY-ifj-Vu0fLU1KK2u5ZplzBcwETHAoSgDRpqfbtPV0iaNDtyudIzOGQ5UVhg_FE_laFJNAlyJypkqFVkLy5yhQOa8JUUniQc5TKBLo9gneyrrJ35n6c_FPQ"  -u"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36" -K DD5CCD9FC966BC8FF3DF24261D3E6915 -a https://filmoline.streaming.mediaservices.windows.net/66ce5755-b672-4764-99c5-138bf1b1c37a/15517___cmc_Orangestudio_Caricaturistes_les_fantassins_de_la_democratie_vf_mezz.ism/QualityLevels(256000)/Manifest(audio_fre,format=m3u8-aapl) https://filmoline.streaming.mediaservices.windows.net/66ce5755-b672-4764-99c5-138bf1b1c37a/15517___cmc_Orangestudio_Caricaturistes_les_fantassins_de_la_democratie_vf_mezz.ism/QualityLevels(500000)/Manifest(video,format=m3u8-aapl) </LocalDebuggerCommandArguments>
     <LocalDebuggerAttach>false</LocalDebuggerAttach>
   </PropertyGroup>
 </Project>

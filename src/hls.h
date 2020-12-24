@@ -98,6 +98,8 @@ int download_live_hls(write_ctx_t *ctx, hls_media_playlist_t *me);
 bool consecutive_sync_byte(uint8_t *buf, size_t len, uint8_t n);
 uint8_t * find_first_ts_packet(ByteBuffer_t *buf);
 int download_hls(write_ctx_t *ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
+static size_t priv_write(const uint8_t* data, size_t len, void* opaque);
+//int download_hls_fragment(void* session, hls_media_playlist_t* me, hls_media_playlist_t* me_audio);
 int print_enc_keys(hls_media_playlist_t *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(hls_media_playlist_t *me);
