@@ -61,7 +61,7 @@ extern struct hls_args hls_args;
 
 int str_to_bin(uint8_t *data, char *hexstring, int len);
 int parse_argv(int argc, char * const argv[]);
-FILE* get_output_file(void);
+FILE* get_output_file(char prefix[]);
 size_t priv_write(const uint8_t *data, size_t len, void *opaque);
 bool is_file_exists(const char *filename);
 

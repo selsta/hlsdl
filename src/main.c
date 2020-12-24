@@ -317,9 +317,10 @@ int main(int argc, char *argv[])
         int ret = -1;
 
         if (media_playlist.is_endlist) {
-            ret = download_hls(&media_playlist, &audio_media_playlist, hls_args.skip_merge);
+            ret = download_hls(&media_playlist, &audio_media_playlist, !hls_args.skip_merge);
         } else {
-            FILE *out_file = get_output_file();
+            char prefix[] = "";
+            FILE *out_file = get_output_file(prefix);
             if (out_file) {
                 write_ctx_t out_ctx = {priv_write, out_file};
                 ret = download_live_hls(&out_ctx, &media_playlist);

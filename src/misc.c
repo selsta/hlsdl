@@ -258,7 +258,7 @@ end_repl_str:
     return ret;
 }
 
-FILE* get_output_file(void)
+FILE* get_output_file(char prefix[])
 {
     FILE *pFile = NULL;
 
@@ -274,13 +274,18 @@ FILE* get_output_file(void)
 #endif
         fflush(stdout);
     } else {
-        char filename[MAX_FILENAME_LEN];
+        char filename[MAX_FILENAME_LEN + strlen(prefix) + 1];
+        strcpy(filename, prefix);
+
         if (hls_args.filename) {
-            strcpy(filename, hls_args.filename);
+            strncat(filename, hls_args.filename, strlen(hls_args.filename));
         }
         else {
-            strcpy(filename, "000_hls_output.ts");
+            char default_filename[] = "hls_output.ts";
+            strncat(filename, default_filename, strlen(default_filename));
         }
+
+        MSG_API("Using output filename: %s\n", filename);
 
         if (is_file_exists(filename)) {
             if (hls_args.force_overwrite) {

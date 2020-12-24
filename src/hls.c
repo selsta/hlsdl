@@ -1562,13 +1562,21 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio, bool 
     set_timeout_session(session, 2L, 3L);
     assert(session);
     time_t repTime = 0;
+    int i = 0;
 
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
     struct ByteBuffer seg;
     struct ByteBuffer seg_audio;
 
-    FILE *out_file = get_output_file();
+    char prefix[5];
+    if (!merge) {
+        strcpy(prefix, "000_");
+    } else {
+        strcpy(prefix, "");
+    }
+
+    FILE *out_file = get_output_file(prefix);
     if (!out_file) {
         MSG_ERROR("Failed to open output file!\n");
         return -1;
@@ -1576,7 +1584,6 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio, bool 
 
     write_ctx_t out_ctx_ = {priv_write, out_file};
     write_ctx_t *out_ctx = &out_ctx_;
-    // fclose(out_file);
 
     struct hls_media_segment *ms = me->first_media_segment;
     struct hls_media_segment *ms_audio = NULL;
@@ -1634,9 +1641,29 @@ int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio, bool 
         }
 
         ms = ms->next;
+
+        i++;
+
+        if (!merge) {
+            if (out_file) {
+                fclose(out_file);
+            }
+
+            sprintf(prefix, "%03d_", i);
+            MSG_API("Creating filename with prefix: %s (i=%d)\n", prefix, i);
+            out_file = get_output_file(prefix);
+            if (!out_file) {
+                MSG_ERROR("Failed to open output file!\n");
+                return -1;
+            }
+        }
     }
 
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+
+    if (out_file) {
+        fclose(out_file);
+    }
 
     if (session) {
         clean_http_session(session);
