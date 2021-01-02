@@ -31,7 +31,7 @@ CFLAGS+=-DPREFIX='"$(PREFIX)"'
 ifeq ("$(OSNAME)", "cygwin")
 	LDFLAGS+=-lpthread $(shell pkg-config libcurl --static --libs)
 else ifneq ($(findstring "$(OSNAME)","mingw32" "mingw64"),)
-	LDFLAGS+=-Wl,-Bstatic -lpthread -lcurl -lnghttp2 -lssh2 -lbrotlidec-static -lbrotlicommon-static -lssl -lcrypto -lcrypt32 -lwsock32 -lws2_32 -lwldap32 -lz
+	LDFLAGS+=-Wl,-Bstatic -lpthread -lcurl -lnghttp2 -lssh2 -lbrotlidec-static -lbrotlicommon-static -lssl -lcrypto -lcrypt32 -lwsock32 -lws2_32 -lwldap32 -lz -lzstd
 else
 	LDFLAGS+=-lpthread -lcurl -lcrypto -lssl
 endif
