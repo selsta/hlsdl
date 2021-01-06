@@ -112,7 +112,10 @@ int parse_argv(int argc, char * const argv[])
             hls_args.segment_download_retries = atoi(optarg);
             break;
         case 'o':
-            hls_args.filename = optarg;
+	    if(strlen(optarg) < MAX_FILENAME_LEN)
+                hls_args.filename = optarg;
+            else
+		MSG_PRINT("Output filename is too long. Using default filename instead.\n");
             break;
         case 't':
             hls_args.dump_ts_urls = true;
