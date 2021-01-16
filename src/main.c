@@ -290,13 +290,13 @@ int main(int argc, char *argv[])
                         while (audio) {
                             if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
                                 MSG_PRINT("%d: Name: %s, Language: %s\n", i, audio->name, audio->lang ? audio->lang : "unknown");
-                                i += 1;
                             }
+                            i += 1;
                             audio = audio->next;
                         }
 
                         MSG_PRINT("Which Language should be downloaded? ");
-                        if (scanf("%d", &audio_choice) != 1 || audio_choice <= 0 || audio_choice >= i) {
+                        if (scanf("%d", &audio_choice) != 1 || audio_choice < 0 || audio_choice >= i) {
                             MSG_ERROR("Wrong input!\n");
                             exit(1);
                         }
