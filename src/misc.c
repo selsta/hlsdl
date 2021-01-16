@@ -1,3 +1,4 @@
+#include <libgen.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -28,6 +29,7 @@ static void print_help(const char *filename)
            "-A ... Select audio language.\n"
            "-v ... Verbose more information.\n"
            "-o ... Choose name of output file (\"-\" alias for stdout).\n"
+           "-m ... Don't merge output - save individual parts instead.\n"
            "-u ... Set custom HTTP User-Agent header.\n"
            "-h ... Set custom HTTP header.\n"
            "-p ... Set proxy uri.\n"
@@ -41,6 +43,7 @@ static void print_help(const char *filename)
            "-t ... Print the links to the .ts files.\n"
            "-s ... Set live start offset in seconds.\n"
            "-i ... Set live stream download duration in seconds.\n"
+           "-I ... Ignore HTTP errors.\n"
            "-e ... Set refresh delay in seconds.\n"
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
@@ -55,7 +58,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:mu:h:s:i:Ir:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -117,8 +120,14 @@ int parse_argv(int argc, char * const argv[])
             else
                 MSG_PRINT("Output filename is too long. Using default filename instead.\n");
             break;
+        case 'm':
+            hls_args.skip_merge = true;
+            break;
         case 't':
             hls_args.dump_ts_urls = true;
+            break;
+        case 'I':
+            hls_args.ignore_http_errors = true;
             break;
         case 'd':
             hls_args.dump_dec_cmd = true;
@@ -255,4 +264,88 @@ end_repl_str:
      * which will be NULL in the event of an error. */
     free(pos_cache);
     return ret;
+}
+
+FILE* get_output_file(char prefix[])
+{
+    FILE *pFile = NULL;
+
+    if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
+        // Set "stdout" to have binary mode:
+        fflush(stdout);
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+        pFile = freopen(NULL, "wb", stdout);
+#else
+        if (-1 != setmode(_fileno(stdout), _O_BINARY)) {
+            pFile = stdout;
+        }
+#endif
+        fflush(stdout);
+    } else {
+        char filename[MAX_FILENAME_LEN + strlen(prefix) + 1];
+        char *file_basename = NULL;
+        file_basename = (char *) malloc(MAX_FILENAME_LEN + strlen(prefix) + 1);
+
+        if (hls_args.filename) {
+            strcpy(filename, dirname(hls_args.filename));
+            strcat(filename, "/");
+            strcpy(file_basename, basename(hls_args.filename));
+        } else {
+            strcpy(file_basename, "hls_output.ts");
+        }
+
+        strncat(filename, prefix, strlen(prefix));
+        strncat(filename, file_basename, strlen(file_basename));
+
+        MSG_DBG("Using output filename: %s\n", filename);
+
+        if (is_file_exists(filename)) {
+            if (hls_args.force_overwrite) {
+                if (remove(filename) != 0) {
+                    MSG_ERROR("Error overwriting file");
+                    exit(1);
+                }
+            }
+            else {
+                char userchoice = '\0';
+                MSG_PRINT("File already exists. Overwrite? (y/n) ");
+                if (scanf("\n%c", &userchoice) && userchoice == 'y') {
+                    if (remove(filename) != 0) {
+                        MSG_ERROR("Error overwriting file");
+                        exit(1);
+                    }
+                }
+                else {
+                    MSG_WARNING("Choose a different filename. Exiting.\n");
+                    exit(0);
+                }
+            }
+        }
+
+        pFile = fopen(filename, "wb");
+    }
+
+    if (pFile == NULL)
+    {
+        MSG_ERROR("Error can not open output file\n");
+        exit(1);
+    }
+    return pFile;
+}
+
+size_t priv_write(const uint8_t *data, size_t len, void *opaque) {
+    return fwrite(data, 1, len, opaque);
+}
+
+bool is_file_exists(const char *filename)
+{
+#ifndef _MSC_VER
+    return access(filename, F_OK) != -1;
+#else
+    struct stat info;
+    int ret = -1;
+
+    ret = stat(filename, &info);
+    return 0 == ret;
+#endif
 }

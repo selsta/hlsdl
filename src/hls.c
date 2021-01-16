@@ -1467,7 +1467,7 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
     int retries = 0;
     int ret = 0;
     while (true) {
-        MSG_PRINT("Downloading part %d\n", ms->sequence_number);
+        MSG_PRINT("Downloading part %d from %s\n", ms->sequence_number, ms->url);
 
         memset(seg, 0x00, sizeof(*seg));
         size_t size = 0;
@@ -1551,7 +1551,7 @@ uint8_t * find_first_ts_packet(ByteBuffer_t *buf) {
     return NULL;
 }
 
-int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio)
+int download_hls(hls_media_playlist_t *me, hls_media_playlist_t *me_audio, bool merge, bool ignore_http_errors)
 {
     MSG_VERBOSE("Downloading segments.\n");
     MSG_API("{\"d_t\":\"vod\"}\n"); // d_t - download type
@@ -1562,11 +1562,28 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     set_timeout_session(session, 2L, 3L);
     assert(session);
     time_t repTime = 0;
+    int i = 0;
 
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
     struct ByteBuffer seg;
     struct ByteBuffer seg_audio;
+
+    char prefix[5];
+    if (!merge) {
+        sprintf(prefix, "%03d_", i);
+    } else {
+        strcpy(prefix, "");
+    }
+
+    FILE *out_file = get_output_file(prefix);
+    if (!out_file) {
+        MSG_ERROR("Failed to open output file!\n");
+        return -1;
+    }
+
+    write_ctx_t out_ctx_ = {priv_write, out_file};
+    write_ctx_t *out_ctx = &out_ctx_;
 
     struct hls_media_segment *ms = me->first_media_segment;
     struct hls_media_segment *ms_audio = NULL;
@@ -1579,54 +1596,74 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     }
 
     while(ms) {
-        if (0 != vod_download_segment(&session, me, ms, &seg)) {
+        if (0 == vod_download_segment(&session, me, ms, &seg)) {
+            uint8_t *first_video_packet = find_first_ts_packet(&seg);
+            uint8_t *first_audio_packet = NULL;
+            if (ms_audio) {
+                if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
+                    break;
+                }
+                first_audio_packet = find_first_ts_packet(&seg_audio);
+            }
+
+            // first segment should be TS for success merge
+            if (first_video_packet && first_audio_packet) {
+                size_t video_len = seg.len - (first_video_packet - seg.data);
+                size_t audio_len = seg_audio.len - (first_audio_packet - seg_audio.data);
+
+                download_size += merge_packets(
+                    &merge_context,
+                    first_video_packet,
+                    video_len,
+                    first_audio_packet,
+                    audio_len
+                );
+            } else {
+                download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+            }
+
+            if (ms_audio) {
+                free(seg_audio.data);
+                ms_audio = ms_audio->next;
+            }
+
+            free(seg.data);
+
+            downloaded_duration_ms += ms->duration_ms;
+
+            time_t curRepTime = time(NULL);
+            if ((curRepTime - repTime) >= 1) {
+                MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+                repTime = curRepTime;
+            }
+        } else if (ignore_http_errors) {
+            MSG_WARNING("Ignoring error downloading segment %d\n", i+1);
+        } else {
             break;
         }
 
-        uint8_t *first_video_packet = find_first_ts_packet(&seg);
-        uint8_t *first_audio_packet = NULL;
-        if (ms_audio) {
-            if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
-                break;
-            }
-            first_audio_packet = find_first_ts_packet(&seg_audio);
-        }
-
-        // first segment should be TS for success merge
-        if (first_video_packet && first_audio_packet) {
-            size_t video_len = seg.len - (first_video_packet - seg.data);
-            size_t audio_len = seg_audio.len - (first_audio_packet - seg_audio.data);
-
-            download_size += merge_packets(
-                &merge_context,
-                first_video_packet,
-                video_len,
-                first_audio_packet,
-                audio_len
-            );
-        } else {
-            download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
-        }
-
-        if (ms_audio) {
-            free(seg_audio.data);
-            ms_audio = ms_audio->next;
-        }
-
-        free(seg.data);
-
-        downloaded_duration_ms += ms->duration_ms;
-
-        time_t curRepTime = time(NULL);
-        if ((curRepTime - repTime) >= 1) {
-            MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
-            repTime = curRepTime;
-        }
-
         ms = ms->next;
+        i++;
+
+        if (ms && !merge) {
+            if (out_file) {
+                fclose(out_file);
+            }
+
+            sprintf(prefix, "%03d_", i);
+            out_file = get_output_file(prefix);
+            if (!out_file) {
+                MSG_ERROR("Failed to open output file!\n");
+                return -1;
+            }
+        }
     }
 
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
+
+    if (out_file) {
+        fclose(out_file);
+    }
 
     if (session) {
         clean_http_session(session);
