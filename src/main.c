@@ -257,6 +257,7 @@ int main(int argc, char *argv[])
                         selected_audio = audio;
                     }
                 }
+                audio = audio->next;
             }
 
             if (has_audio_playlist) {
@@ -270,7 +271,6 @@ int main(int argc, char *argv[])
                         audio = master_playlist.audio;
                         while (audio) {
                             if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                                i += 1;
                                 if (hls_args.use_best && audio->is_default) {
                                     audio_choice = i;
                                     break;
@@ -280,6 +280,7 @@ int main(int argc, char *argv[])
                                     break;
                                 }
                             }
+                            i += 1;
                             audio = audio->next;
                         }
                     }
@@ -306,12 +307,12 @@ int main(int argc, char *argv[])
                     audio = master_playlist.audio;
                     while (audio) {
                         if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                            i += 1;
                             if (i == audio_choice) {
                                 selected_audio = audio;
                                 break;
                             }
                         }
+                        i += 1;
                         audio = audio->next;
                     }
 
