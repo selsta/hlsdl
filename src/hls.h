@@ -13,6 +13,7 @@ extern "C" {
 #define MASTER_PLAYLIST 0
 #define MEDIA_PLAYLIST 1
 
+#define ENC_AES_SAMPLE_CTR 0x03
 #define ENC_AES_SAMPLE 0x02
 #define ENC_AES128 0x01
 #define ENC_NONE 0x00

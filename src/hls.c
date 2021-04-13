@@ -105,7 +105,9 @@ long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char *
 
 int is_playlist_FPS(char* source)
 {
-    return strstr(source, "KEYFORMAT=\"com.apple.streamingkeydelivery\"");
+    return strstr(source, "KEYFORMAT=\"com.apple.streamingkeydelivery\"") ||
+           strstr(source, "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed") ||
+           strstr(source, "com.microsoft.playready");
 }
 
 int get_playlist_type(char *source)
@@ -247,6 +249,9 @@ static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, cha
     if (!strncmp(tag, "#EXT-X-KEY:METHOD=AES-128", 25)) {
         enc_type = ENC_AES128;
         me->enc_aes.iv_is_static = false;
+    } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES-CTR", 32)) {
+        enc_type = ENC_AES_SAMPLE_CTR;
+        me->enc_aes.iv_is_static = is_playlist_FPS(me->source);
     } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
         enc_type = ENC_AES_SAMPLE;
         me->enc_aes.iv_is_static = is_playlist_FPS(me->source);

@@ -21,6 +21,14 @@
 #include "msg.h"
 #include "misc.h"
 
+char* str_ecryption_type[] ={
+    "NONE",
+    "AES-128",
+    "SAMPLE-AES",
+    "SAMPLE-AES-CTR",
+};
+
+
 static size_t priv_write(const uint8_t *data, size_t len, void *opaque) {
     return fwrite(data, 1, len, opaque);
 }
@@ -370,11 +378,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (media_playlist.encryption) {
-        MSG_PRINT("HLS Stream is %s encrypted.\n",
-                  media_playlist.encryptiontype == ENC_AES128 ? "AES-128" :
-                                                                "SAMPLE-AES");
-    }
+    MSG_PRINT("HLS Stream is %s encrypted.\n",
+                  str_ecryption_type[media_playlist.encryptiontype]);
 
     MSG_VERBOSE("Media Playlist parsed successfully.\n");
 
