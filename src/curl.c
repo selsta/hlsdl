@@ -301,11 +301,13 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
             *out = memcpy(*out, chunk.memory, KEYLEN);
         } else if (type == BINARY) {
             *out = malloc(chunk.size);
-            if(chunk.memory[0]==0x89 && chunk.memory[1]==0x50 && chunk.memory[2]==0x4E){
-				*out = memcpy(*out,chunk.memory + 16, chunk.size);
-			}else{
+            // hack to remove 1x1 png as seen e.g. here:
+            // https://laurentmeyer.medium.com/deep-dive-in-the-illegal-streaming-world-cd11fae63497
+            if (chunk.size > 16 && (chunk.memory[0] == 0x89 && chunk.memory[1] == 0x50 && chunk.memory[2] == 0x4E)) {
+                *out = memcpy(*out, chunk.memory + 16, chunk.size);
+            } else {
                 *out = memcpy(*out, chunk.memory, chunk.size);
-			}
+            }
         }
     }
 
