@@ -1770,7 +1770,7 @@ int fill_key_value(struct enc_aes128 *es)
                 free(key_url);
             }
 
-            if (http_code != 200 || size == 0) {
+            if (http_code != 200) {
                 MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
                 return 1;
             }
