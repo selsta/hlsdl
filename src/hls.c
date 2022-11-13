@@ -1775,6 +1775,11 @@ int fill_key_value(struct enc_aes128 *es)
                 return 1;
             }
 
+            if (size != KEYLEN) {
+                MSG_ERROR("Wrong length key-file. Expected %u bytes but got %u.\n", KEYLEN, size);
+                return 1;
+            }
+
             memcpy(es->key_value, key_value, KEYLEN);
             free(key_value);
 
