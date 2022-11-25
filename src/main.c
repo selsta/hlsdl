@@ -121,6 +121,7 @@ static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_
 
     if (http_code != 200) {
         MSG_API("{\"error_code\":%d, \"error_msg\":\"\"}\n", (int)http_code);
+        return false;
     }
 
     if (size == 0) {
