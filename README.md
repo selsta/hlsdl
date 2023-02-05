@@ -19,10 +19,16 @@ Linux:
 Windows:
 https://github.com/selsta/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
 
+Docker: `docker build -t hlsdl:latest .`
+
 
 Usage and Options
 -----------------
 `./hlsdl [options] url`
+
+```
+docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
+```
 
 ---------------------------
 ```
