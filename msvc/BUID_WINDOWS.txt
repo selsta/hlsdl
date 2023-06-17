@@ -4,7 +4,7 @@
 git:
 https://git-scm.com/download/win
 
-Visual Studio 2017
+Visual Studio 2017 (2019 tested works as well, other newer versions might also work)
 https://visualstudio.microsoft.com/pl/downloads/
     community 
         C++
@@ -17,13 +17,15 @@ https://cmake.org/download/
 # Download & Build
 ######################################################################
 
-# clonse hlsdl
+# Tip: Make a clean new folder as your working directory specifically for building this project and cd this
+
+# clone hlsdl
 git clone https://github.com/samsamsam-iptvplayer/hlsdl.git
 
-# Download OpenSSL MSCVC
+# Download Pre-compiled OpenSSL MSCVC, and put the extracted folder to your working directory
 https://www.npcglib.org/~stathis/blog/precompiled-openssl/
 
-# Download pthreads
+# Download pthreads, also put the extracted folder to your working directory
 https://sourceware.org/pthreads-win32/
 ftp://sourceware.org/pub/pthreads-win32/pthreads-w32-2-9-1-release.zip
 
@@ -42,6 +44,8 @@ nmake clean VC-static-debug
 
 copy pthreadVC2.lib ..\Pre-built.2\lib\x64\pthreadVC2MTd.lib
 
+# Tip: Before continuing to the next step (clone curl), switch directory first to the initial working directory so the folders doesn't messed up
+cd ..\..\
 
 # clone curl
 
@@ -59,7 +63,7 @@ buildconf.bat
 
 "c:\Program Files (x86)\Microsoft Visual Studio\2017\Community\\vc\Auxiliary\Build\vcvarsall.bat" x64
 
-copy ..\hlsdl\vs2017\curl\MakefileBuild.vc winbuild\MakefileBuild.vc
+copy ..\hlsdl\msvc\curl\MakefileBuild.vc winbuild\MakefileBuild.vc
 
 cd winbuild
 
@@ -69,7 +73,13 @@ nmake /f Makefile.vc mode=dll WITH_SSL=dll SSL_PATH=../../openssl-1.1.0f-vs2017 
 
 nmake /f Makefile.vc mode=static WITH_SSL=static SSL_PATH=../../openssl-1.1.0f-vs2017 DEBUG=no MACHINE=x64
 
-..\builds\libcurl-vc-x64-release-dll-ipv6-sspi-winssl\bin\curl.exe --version
+# Check the built curl
+..\builds\libcurl-vc-x64-release-dll-ssl-dll-ipv6-sspi\bin\curl.exe --version
 
-# Open project solution hlsdl.sln
+# Open project solution hlsdl.sln inside hlsdl\msvc\ and build the project
 
+# Tip: A note to avoid confusion, the working directory initially created should contains folders like these:
+curl (clone of curl repo)
+hlsdl (clone of this repo)
+openssl-1.1.0f-vs2017 (from downloaded openssl-1.1.0f-vs2017.7z)
+pthreads-w32-2-9-1-release (from downloaded pthreads-w32-2-9-1-release.zip)
