@@ -10,9 +10,13 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: make
-      run: make
+      run: |
+        mkdir build
+        cd build
+        cmake ../src
+        cmake --build .
     - name: download testfile
-      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+      run: build/hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
       run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
 
@@ -27,8 +31,38 @@ jobs:
     - name: install libcurl libcrypto
       run: sudo apt -y install libcurl4-openssl-dev libssl-dev
     - name: make
-      run: make
+      run: |
+        mkdir build
+        cd build
+        cmake ../src
+        cmake --build .
     - name: download testfile
-      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+      run: build/hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+    - name: verify testfile
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+
+
+  build-windows:
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - uses: eine/setup-msys2@v1
+      with:
+        install: mingw-w64-x86_64-toolchain make mingw-w64-x86_64-cmake mingw-w64-x86_64-openssl mingw-w64-x86_64-curl
+    - name: build
+      run: |
+          mkdir build
+          cd build
+          cmake -G "MSYS Makefiles" ../src
+          cmake --build .
+    - name: download testfile
+      run: build/hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
       run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
