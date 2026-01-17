@@ -1,7 +1,9 @@
 hlsdl
 =====
 
-This program converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
+Converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
+
+![hlsdl build](https://github.com/selsta/hlsdl/workflows/hlsdl%20build/badge.svg)
 
 Quick Start
 -----------
