@@ -3,24 +3,111 @@ hlsdl
 
 This program converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
 
+Quick Start
+-----------
+
+## Build
+
 Requirements
 ------------
 
-This program requires libcurl and libcrypto libraries.
+### Common:
+- libcurl
+- OpenSSL/libcrypto
 
-Build
------
+### Windows
 
-![hlsdl build](https://github.com/selsta/hlsdl/workflows/hlsdl%20build/badge.svg)
+#### Prerequisites
 
-Linux:
-`make && make install && make clean`
+- Visual Studio 2017 or newer
+- CMake
+- Git
+- Pre-compiled OpenSSL for MSVC
+- pthreads-win32
 
-Windows:
-https://github.com/selsta/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
+See detailed Windows build instructions in [BUILD_WINDOWS.txt](msvc/BUILD_WINDOWS.txt).
 
-Docker: `docker build -t hlsdl:latest .`
+### macOS
 
+#### Prerequisites
+
+- Xcode Command Line Tools
+- Homebrew (recommended for OpenSSL)
+
+```bash
+# If you get OpenSSL errors:
+brew install openssl
+```
+
+### macOS/Linux:
+
+Clone the repository
+
+```bash
+git clone https://github.com/selsta/hlsdl
+cd hlsdl
+```
+
+# Compile
+
+```bash
+# Install (optional, copies to /usr/local/bin)
+sudo make install
+```
+
+# Run
+
+```
+./hlsdl [url]
+```
+
+**Note:** 
+
+If you encounter `xcrun` errors during `make`, try:
+
+```bash
+xcode-select --install
+# If already installed, run:
+sudo xcode-select --reset
+```
+
+Or `"openssl/conf.h file not found"` ?
+
+```bash
+brew install openssl
+```
+
+### Linux
+
+#### Prerequisites
+
+```bash
+# Ubuntu/Debian:
+sudo apt-get install libcurl4-openssl-dev libssl-dev build-essential
+
+# Fedora/RHEL:
+sudo dnf install libcurl-devel openssl-devel gcc make
+```
+
+Compile:
+```bash
+make && sudo make install && make clean
+```
+
+### Docker
+```bash
+docker build -t hlsdl:latest .
+docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
+```
+
+Troubleshooting
+---------------
+
+### Program not found after installation
+If `hlsdl` command isn't recognized, either:
+1. Run from the build directory: `./hlsdl [url]`
+2. Install with `sudo make install` (places in `/usr/local/bin`)
+3. Add the installation directory to your PATH
 
 Usage and Options
 -----------------
@@ -30,7 +117,22 @@ Usage and Options
 docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 ```
 
----------------------------
+## Basic Usage Examples
+```bash
+# Download a stream
+./hlsdl -o output.ts https://example.com/stream.m3u8
+
+# Choose best quality
+./hlsdl -b https://example.com/stream.m3u8
+
+# Set output filename
+./hlsdl -o my_video.ts https://example.com/stream.m3u8
+
+# Verbose output
+./hlsdl -v https://example.com/stream.m3u8
+```
+
+## All Options
 ```
 -b ... Automatically choose the best quality.
 
@@ -82,6 +184,28 @@ docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 
 -C ... the file name of file holding cookie data in the old Netscape / Mozilla cookie data format.
 ```
+
+FAQ
+---
+
+### Q: Does hlsdl support DRM-protected streams?
+A: hlsdl supports AES-128 and SAMPLE-AES encryption but does **not** support DRM-protected streams (like Widevine, PlayReady, FairPlay, etc.). DRM-protected content requires proprietary decryption modules that cannot be used with hlsdl.
+
+### Q: How do I find the .m3u8 URL from a website?
+A: You can use browser developer tools (F12):
+1. Open Network tab
+2. Filter by "m3u8" or "media"
+3. Play the video
+4. Look for .m3u8 requests in the network log
+
+### Q: Can I download streams that play in my browser?
+A: Only if they use standard AES-128 encryption without DRM. Many streaming services use DRM which prevents downloading.
+
+### Q: What about SAMPLE-AES with DRM?
+A: Not supported. SAMPLE-AES without DRM is supported, but when combined with DRM (like FairPlay), it cannot be decrypted with hlsdl.
+
+### Q: The download stops at "DRM detected"
+A: This means the stream uses DRM protection that hlsdl cannot decrypt. The `-F` option can force ignore this detection, but the resulting file will be unplayable.
 
 ToDo
 -----
