@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #ifndef _MSC_VER
 #include <unistd.h>
@@ -17,10 +18,12 @@
 
 struct hls_args hls_args;
 
+#define RESUME_SUFFIX ".hlsdl.resume"
+
 static void print_help(const char *filename)
 {
-    printf("hlsdl v0.27\n");
-    printf("(c) 2017-2020 @selsta, samsamsam@o2.pl\n");
+    printf("hlsdl v0.31\n");
+    printf("(c) 2017-2026 @selsta, samsamsam@o2.pl\n");
     printf("Usage: %s [options] url\n\n"
            "-b ... Automatically choose the best quality.\n"
            "-W ... Choose largest width lower or equal than this.\n"
@@ -34,6 +37,7 @@ static void print_help(const char *filename)
            "-k ... Allow to replace part of AES key uri - old.\n"
            "-n ... Allow to replace part of AES key uri - new.\n"
            "-f ... Force overwriting the output file.\n"
+           "-R ... Resume an interrupted VOD download (keeps a <output>.hlsdl.resume sidecar).\n"
            "-F ... Force ignore detection of DRM.\n"
            "-K ... Force AES key value (hexstring)\n"
            "-q ... Print less to the console.\n"
@@ -55,7 +59,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfRFK:ctdo:u:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -144,6 +148,9 @@ int parse_argv(int argc, char * const argv[])
         case 'c':
             hls_args.accept_partial_content = true;
             break;
+        case 'R':
+            hls_args.resume = true;
+            break;
         default:
             MSG_ERROR("?? getopt returned character code 0%o ??\n", c);
             ret = -1;
@@ -159,6 +166,108 @@ int parse_argv(int argc, char * const argv[])
 
     print_help(argv[0]);
     return 1;
+}
+
+static void resume_sidecar_path(char *dst, size_t dst_sz, const char *base)
+{
+    snprintf(dst, dst_sz, "%s%s", base, RESUME_SUFFIX);
+}
+
+hls_resume_state_t *resume_load(const char *out_filename, int total, int has_map, uint64_t fingerprint)
+{
+    hls_resume_state_t *rs = calloc(1, sizeof(*rs));
+    if (!rs) {
+        return NULL;
+    }
+    snprintf(rs->out_filename, sizeof(rs->out_filename), "%s", out_filename);
+    rs->total       = total;
+    rs->map         = has_map;
+    rs->fingerprint = fingerprint;
+
+    char path[MAX_FILENAME_LEN + 32];
+    resume_sidecar_path(path, sizeof(path), out_filename);
+
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        return rs;   /* no sidecar - fresh start */
+    }
+
+    int ver = 0, ftotal = -1, fdone = -1, fmap = -1;
+    long long fbytes = -1;
+    unsigned long long ffp = 0;
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        if (sscanf(line, "hlsdl-resume %d", &ver) == 1) continue;
+        if (sscanf(line, "total %d", &ftotal) == 1) continue;
+        if (sscanf(line, "done %d", &fdone) == 1) continue;
+        if (sscanf(line, "bytes %lld", &fbytes) == 1) continue;
+        if (sscanf(line, "map %d", &fmap) == 1) continue;
+        if (sscanf(line, "fingerprint %llx", &ffp) == 1) continue;
+    }
+    fclose(f);
+
+    if (ver != 2) {
+        MSG_WARNING("resume: unrecognized sidecar - starting fresh\n");
+        return rs;
+    }
+    if (ftotal != total || fmap != has_map || (uint64_t)ffp != fingerprint) {
+        MSG_WARNING("resume: this playlist does not match the sidecar - starting fresh\n");
+        return rs;
+    }
+    if (fdone < 0 || fdone > total || fbytes < 0) {
+        MSG_WARNING("resume: sidecar values out of range - starting fresh\n");
+        return rs;
+    }
+
+    rs->done  = fdone;
+    rs->bytes = (int64_t)fbytes;
+    rs->map   = fmap;
+    MSG_PRINT("Resuming: %d/%d segments, %lld bytes already downloaded.\n",
+              rs->done, rs->total, (long long)rs->bytes);
+    return rs;
+}
+
+void resume_save(hls_resume_state_t *rs, int done, int64_t bytes)
+{
+    if (!rs) {
+        return;
+    }
+    rs->done  = done;
+    rs->bytes = bytes;
+
+    char path[MAX_FILENAME_LEN + 32];
+    char tmp[MAX_FILENAME_LEN + 40];
+    resume_sidecar_path(path, sizeof(path), rs->out_filename);
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+
+    FILE *f = fopen(tmp, "w");
+    if (!f) {
+        return;
+    }
+    fprintf(f,
+            "hlsdl-resume 2\n"
+            "total %d\n"
+            "done %d\n"
+            "bytes %" PRId64 "\n"
+            "map %d\n"
+            "fingerprint %016" PRIx64 "\n",
+            rs->total, rs->done, rs->bytes, rs->map, rs->fingerprint);
+    fflush(f);
+    fclose(f);
+#ifdef _MSC_VER
+    /* MSVC rename() will not replace an existing target. */
+    remove(path);
+#endif
+    if (rename(tmp, path) != 0) {
+        remove(tmp);
+    }
+}
+
+void resume_clear(const char *out_filename)
+{
+    char path[MAX_FILENAME_LEN + 32];
+    resume_sidecar_path(path, sizeof(path), out_filename);
+    remove(path);
 }
 
 int str_to_bin(uint8_t *data, char *hexstring, int len)

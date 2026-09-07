@@ -6,29 +6,275 @@ jobs:
   build-macos:
 
     runs-on: macOS-latest
-    
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: make
       run: make
     - name: download testfile
       run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
-      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c
+    - name: download fmp4 testfile (EXT-X-MAP + BYTERANGE)
+      run: ./hlsdl -b -o test_fmp4.mp4 "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8"
+    - name: verify fmp4 testfile starts with an ftyp box
+      run: |
+        test -s test_fmp4.mp4
+        dd if=test_fmp4.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
 
   build-ubuntu:
 
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: update apt
       run: sudo apt update
-    - name: install libcurl libcrypto
-      run: sudo apt -y install libcurl4-openssl-dev libssl-dev
+    - name: install libcurl libcrypto ffmpeg
+      run: sudo apt -y install libcurl4-openssl-dev libssl-dev ffmpeg
     - name: make
       run: make
     - name: download testfile
       run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
-      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c
+    - name: download fmp4 testfile (EXT-X-MAP + BYTERANGE)
+      run: ./hlsdl -b -o test_fmp4.mp4 "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8"
+    - name: verify fmp4 testfile is a playable mp4
+      run: |
+        set -eux
+        test -s test_fmp4.mp4
+        dd if=test_fmp4.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
+        # the -b variant maps a ~585 MB progressive file via BYTERANGE; a broken
+        # quote-skip pulls that whole file in as the init AND appends the ranges
+        bytes=$(stat -c%s test_fmp4.mp4)
+        test "$bytes" -gt 50000000
+        test "$bytes" -lt 800000000
+        # -b muxes the default audio, but fMP4 + separate audio is video-only,
+        # so a leaked audio init is the only way an audio stream turns up
+        ffprobe -v error -show_entries stream=codec_type -of csv=p=0 test_fmp4.mp4 > streams.txt
+        cat streams.txt
+        grep -qE '^video' streams.txt
+        ! grep -qE '^audio' streams.txt
+    - name: fixture - fMP4 EXT-X-MAP (separate init file)
+      run: |
+        set -eux
+        mkdir fx && cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=6:s=128x72 -c:v libx264 -g 15 \
+               -f hls -hls_time 2 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_type fmp4 -hls_fmp4_init_filename init.mp4 fmp4.m3u8
+        cat fmp4.m3u8
+        timeout 60 ../hlsdl -f -o out_fmp4.mp4 fmp4.m3u8
+        dd if=out_fmp4.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
+        test "$(grep -a -o ftyp out_fmp4.mp4 | wc -l)" -eq 1
+        ffprobe -v error -show_entries stream=codec_type -of csv=p=0 out_fmp4.mp4 | grep -q video
+    - name: fixture - single-file fMP4 (EXT-X-MAP BYTERANGE, local path)
+      run: |
+        set -eux
+        cd fx
+        # concat the init + fragments into one file and hand-write a byte-range
+        # playlist: #EXT-X-MAP:URI="blob.mp4",BYTERANGE="<n>@0" (quoted, unlike
+        # #EXT-X-BYTERANGE). A broken quote-skip reads size 0 -> local 404.
+        segs=$(grep -v '^#' fmp4.m3u8)
+        cat init.mp4 $segs > blob.mp4
+        isz=$(stat -c%s init.mp4)
+        {
+          printf '#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n'
+          printf '#EXT-X-MAP:URI="blob.mp4",BYTERANGE="%d@0"\n' "$isz"
+          off=$isz
+          for s in $segs; do
+            sz=$(stat -c%s "$s")
+            printf '#EXTINF:1.0,\n#EXT-X-BYTERANGE:%d@%d\nblob.mp4\n' "$sz" "$off"
+            off=$((off + sz))
+          done
+          printf '#EXT-X-ENDLIST\n'
+        } > sf.m3u8
+        cat sf.m3u8
+        timeout 60 ../hlsdl -f -o out_sf.mp4 sf.m3u8
+        dd if=out_sf.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
+        # hlsdl just re-reads the byte ranges in order -> exactly blob.mp4
+        cmp -s out_sf.mp4 blob.mp4
+    - name: fixture - live fMP4, -s 0 keeps the EXT-X-MAP
+      run: |
+        set -eux
+        cd fx
+        # a live playlist (no ENDLIST); 2 s segments so -i 1 stops hlsdl cleanly
+        # (exit 0, file flushed) right after the init segment instead of
+        # spinning on the static playlist until a timeout kill
+        sed '/#EXT-X-ENDLIST/d;/#EXT-X-PLAYLIST-TYPE/d' fmp4.m3u8 > live_fmp4.m3u8
+        cat live_fmp4.m3u8
+        python3 -m http.server 8199 &
+        srv=$!
+        sleep 1
+        timeout 30 ../hlsdl -f -s 0 -i 1 -e 1 -o out_live_fmp4.mp4 "http://127.0.0.1:8199/live_fmp4.m3u8" || true
+        kill $srv 2>/dev/null || true
+        ls -l out_live_fmp4.mp4
+        # -i 1 stops hlsdl right after the init segment, before the first
+        # trimmed media segment is written -> the output must be exactly the
+        # EXT-X-MAP init. A broken trim frees that head and the output starts
+        # with a media fragment (styp / no ftyp) instead.
+        dd if=out_live_fmp4.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
+        cmp -s out_live_fmp4.mp4 init.mp4
+    - name: fixture - TS with a mid-stream EXT-X-DISCONTINUITY
+      run: |
+        set -eux
+        cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=1:s=128x72 -c:v mpeg2video -f mpegts d0.ts
+        ffmpeg -v error -f lavfi -i testsrc=d=1:s=128x72 -c:v mpeg2video -f mpegts d1.ts
+        ffmpeg -v error -f lavfi -i testsrc=d=1:s=64x48  -c:v mpeg2video -f mpegts d2.ts
+        printf '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.0,\nd0.ts\n#EXTINF:1.0,\nd1.ts\n#EXT-X-DISCONTINUITY\n#EXTINF:1.0,\nd2.ts\n#EXT-X-ENDLIST\n' > disc.m3u8
+        timeout 60 ../hlsdl -f -o out_disc.ts disc.m3u8
+        ffprobe -v error -show_entries format=format_name -of csv=p=0 out_disc.ts | grep -q .
+    - name: fixture - TS video + separate audio playlist (A/V merge)
+      run: |
+        set -eux
+        cd fx
+        # video-only and audio-only TS playlists; hlsdl -a muxes them into
+        # one TS via find_first_ts_packet + merge_packets
+        ffmpeg -v error -f lavfi -i testsrc=d=3:s=128x72 -c:v mpeg2video \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'v%d.ts' vplaylist.m3u8
+        ffmpeg -v error -f lavfi -i sine=f=440:d=3 -c:a mp2 \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'a%d.ts' aplaylist.m3u8
+        timeout 60 ../hlsdl -f -a aplaylist.m3u8 -o out_av.ts vplaylist.m3u8
+        ffprobe -v error -show_entries stream=codec_type -of csv=p=0 out_av.ts | sort -u > av.txt
+        cat av.txt
+        grep -q video av.txt
+        grep -q audio av.txt
+    - name: fixture - AES-128 with EXT-X-MAP before EXT-X-KEY
+      run: |
+        set -eux
+        cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=2:s=64x48 -c:v libx264 -g 15 \
+               -f hls -hls_time 2 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_type fmp4 -hls_fmp4_init_filename ki.mp4 ki.m3u8
+        head -c 16 /dev/urandom > enc.key
+        KEYHEX=$(xxd -p -c 32 enc.key)
+        IV=000102030405060708090a0b0c0d0e0f
+        seg=$(grep -v '^#' ki.m3u8 | head -1)
+        openssl aes-128-cbc -e -K "$KEYHEX" -iv "$IV" -in ki.mp4 -out ki.mp4.enc
+        openssl aes-128-cbc -e -K "$KEYHEX" -iv "$IV" -in "$seg"  -out seg0.enc
+        {
+          printf '#EXTM3U\n#EXT-X-VERSION:5\n#EXT-X-TARGETDURATION:2\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n'
+          printf '#EXT-X-MAP:URI="ki.mp4.enc"\n'
+          printf '#EXT-X-KEY:METHOD=AES-128,URI="enc.key",IV=0x%s\n' "$IV"
+          printf '#EXTINF:2.0,\nseg0.enc\n#EXT-X-ENDLIST\n'
+        } > mapkey.m3u8
+        cat mapkey.m3u8
+        timeout 30 ../hlsdl -f -o out_mapkey.mp4 mapkey.m3u8
+        # the init segment must come out decrypted (ftyp box), not ciphertext
+        dd if=out_mapkey.mp4 bs=1 skip=4 count=4 2>/dev/null | grep -q ftyp
+    - name: fixture - unreachable segment fails the download
+      run: |
+        set -eux
+        cd fx
+        printf '#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:1\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:1.0,\ndoes-not-exist.ts\n#EXT-X-ENDLIST\n' > broken.m3u8
+        # a segment that cannot be fetched must give a non-zero exit
+        if timeout 30 ../hlsdl -f -o out_broken.ts broken.m3u8; then
+          echo "hlsdl reported success for an unreachable segment" >&2
+          exit 1
+        fi
+    - name: fixture - interrupted VOD download resumes to the same bytes
+      run: |
+        set -eux
+        cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=5:s=64x48 -c:v mpeg2video \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'rs%d.ts' rs_full.m3u8
+        n=$(grep -c '\.ts$' rs_full.m3u8)
+        test "$n" -ge 4
+        # reference: a clean full download
+        timeout 60 ../hlsdl -f -o ref.ts rs_full.m3u8
+        # interrupt without touching the playlist: make the 3rd segment
+        # briefly unreadable (a real interruption is a transfer failure, not
+        # a playlist edit - and a playlist edit is what the fingerprint is
+        # meant to catch)
+        seg3=$(grep '\.ts$' rs_full.m3u8 | sed -n 3p)
+        chmod 000 "$seg3"
+        if timeout 60 ../hlsdl -f -R -w 1 -o out.ts rs_full.m3u8; then
+          echo "expected the interrupted run to fail" >&2; exit 1
+        fi
+        test -s out.ts.hlsdl.resume
+        grep -q '^hlsdl-resume 2$' out.ts.hlsdl.resume
+        grep -q '^done 2$' out.ts.hlsdl.resume
+        cp out.ts.hlsdl.resume saved.resume
+        # clear the fault and resume against the same playlist
+        chmod 644 "$seg3"
+        timeout 60 ../hlsdl -R -o out.ts rs_full.m3u8
+        test ! -e out.ts.hlsdl.resume
+        cmp ref.ts out.ts
+        # "already complete" no-op: the real sidecar bumped to done == total
+        cp ref.ts out2.ts
+        sed "s/^done .*/done $n/;s/^bytes .*/bytes $(stat -c%s ref.ts)/" saved.resume > out2.ts.hlsdl.resume
+        timeout 30 ../hlsdl -R -o out2.ts rs_full.m3u8
+        test ! -e out2.ts.hlsdl.resume
+        cmp ref.ts out2.ts
+        # a sidecar from a different playlist (same segment count) is refused
+        ffmpeg -v error -f lavfi -i testsrc=d=5:s=48x32 -c:v mpeg2video \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'other%d.ts' other.m3u8
+        test "$(grep -c '\.ts$' other.m3u8)" -eq "$n"
+        timeout 60 ../hlsdl -f -o other_ref.ts other.m3u8
+        cp saved.resume other_out.ts.hlsdl.resume
+        timeout 60 ../hlsdl -f -R -o other_out.ts other.m3u8 2>warn.txt
+        grep -qi 'does not match' warn.txt
+        test ! -e other_out.ts.hlsdl.resume
+        cmp other_ref.ts other_out.ts
+    - name: fixture - interrupted fMP4 (EXT-X-MAP) download resumes
+      run: |
+        set -eux
+        cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=5:s=64x48 -c:v mpeg4 \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_type fmp4 -hls_fmp4_init_filename rfi.mp4 \
+               -hls_segment_filename 'rf%d.m4s' rf_full.m3u8
+        m=$(grep -c '\.m4s$' rf_full.m3u8)
+        test "$m" -ge 4
+        timeout 60 ../hlsdl -f -o rf_ref.mp4 rf_full.m3u8
+        seg3=$(grep '\.m4s$' rf_full.m3u8 | sed -n 3p)
+        chmod 000 "$seg3"
+        if timeout 60 ../hlsdl -f -R -w 1 -o rf_out.mp4 rf_full.m3u8; then
+          echo "expected the interrupted fMP4 run to fail" >&2; exit 1
+        fi
+        grep -q '^map 1$' rf_out.mp4.hlsdl.resume
+        grep -q '^done 2$' rf_out.mp4.hlsdl.resume
+        chmod 644 "$seg3"
+        timeout 60 ../hlsdl -R -o rf_out.mp4 rf_full.m3u8
+        test ! -e rf_out.mp4.hlsdl.resume
+        cmp rf_ref.mp4 rf_out.mp4
+        # exactly one ftyp: the init segment was not re-written on resume
+        test "$(grep -a -o ftyp rf_out.mp4 | wc -l)" -eq 1
+    - name: fixture - interrupted resume on the -a A/V-merge path
+      run: |
+        set -eux
+        cd fx
+        ffmpeg -v error -f lavfi -i testsrc=d=4:s=128x72 -c:v mpeg2video \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'mv%d.ts' mv.m3u8
+        ffmpeg -v error -f lavfi -i sine=f=440:d=4 -c:a mp2 \
+               -f hls -hls_time 1 -hls_list_size 0 -hls_playlist_type vod \
+               -hls_segment_filename 'ma%d.ts' ma.m3u8
+        test "$(grep -c '\.ts$' mv.m3u8)" -ge 3
+        timeout 60 ../hlsdl -f -a ma.m3u8 -o mav_ref.ts mv.m3u8
+        ffprobe -v error -show_entries stream=codec_type -of csv=p=0 mav_ref.ts | sort -u > mav.txt
+        grep -q video mav.txt
+        grep -q audio mav.txt
+        v3=$(grep '\.ts$' mv.m3u8 | sed -n 3p)
+        chmod 000 "$v3"
+        if timeout 60 ../hlsdl -f -R -w 1 -a ma.m3u8 -o mav_out.ts mv.m3u8; then
+          echo "expected the interrupted -a run to fail" >&2; exit 1
+        fi
+        test -s mav_out.ts.hlsdl.resume
+        chmod 644 "$v3"
+        timeout 60 ../hlsdl -R -a ma.m3u8 -o mav_out.ts mv.m3u8
+        test ! -e mav_out.ts.hlsdl.resume
+        test -s mav_out.ts
+        # both streams are still there after the resume splice
+        ffprobe -v error -show_entries stream=codec_type -of csv=p=0 mav_out.ts | sort -u > mav_out.txt
+        grep -q video mav_out.txt
+        grep -q audio mav_out.txt
+        # the resume appended the tail: the file runs most of the ~4 s
+        # reference, not just the 2 segments finished before the break
+        dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 mav_out.ts | cut -d. -f1)
+        test "${dur:-0}" -ge 3

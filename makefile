@@ -27,6 +27,7 @@ CFLAGS+=-Wall -Wstrict-prototypes -Wmissing-prototypes
 CFLAGS+=-Wmissing-declarations -Wshadow -Wpointer-arith -Wcast-qual
 CFLAGS+=-Wsign-compare -Iincludes
 CFLAGS+=-DPREFIX='"$(PREFIX)"'
+CFLAGS+=-D_FILE_OFFSET_BITS=64
 
 ifeq ("$(OSNAME)", "cygwin")
 	LDFLAGS+=-lpthread $(shell pkg-config libcurl --static --libs)

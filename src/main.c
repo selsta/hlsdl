@@ -1,5 +1,14 @@
+/* Must precede every system header so <unistd.h> exposes ftruncate(). The
+ * makefile and the OE recipe also pass -D_FILE_OFFSET_BITS=64 (build-wide, so
+ * ftello()/off_t are 64-bit in every translation unit, not just this one). */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #ifndef _MSC_VER
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #else
 #include <Windows.h>
 #define sleep Sleep
@@ -46,9 +55,54 @@ static bool is_file_exists(const char *filename)
 #endif
 }
 
-static FILE* get_output_file(void)
+/* FNV-1a over the media segment list - each segment's URL and byte range,
+ * video then audio. Two quality variants of the same VOD almost always have
+ * the same segment count, so this is what actually tells a resume run that
+ * the playlist it was handed is a different one. */
+static uint64_t fnv1a(uint64_t h, const void *data, size_t len)
+{
+    const unsigned char *p = data;
+    while (len--) {
+        h ^= *p++;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static uint64_t playlist_fingerprint(const hls_media_playlist_t *me, const hls_media_playlist_t *audio)
+{
+    uint64_t h = 14695981039346656037ULL;   /* FNV-1a 64-bit offset basis */
+    for (int pass = 0; pass < 2; pass++) {
+        const hls_media_playlist_t *pl = pass ? audio : me;
+        if (!pl) {
+            continue;
+        }
+        for (const struct hls_media_segment *s = pl->first_media_segment; s; s = s->next) {
+            if (s->url) {
+                h = fnv1a(h, s->url, strlen(s->url));
+            }
+            h = fnv1a(h, &s->offset, sizeof(s->offset));
+            h = fnv1a(h, &s->size, sizeof(s->size));
+            h = fnv1a(h, &s->is_map, sizeof(s->is_map));
+        }
+        h ^= 0x9e3779b97f4a7c15ULL;   /* separate the video and audio runs */
+    }
+    return h;
+}
+
+static FILE* get_output_file(bool resuming)
 {
     FILE *pFile = NULL;
+
+    /* Reopen the existing output for a resume: no truncation, no overwrite
+     * prompt - the caller positions it at the resume offset. */
+    if (resuming && hls_args.filename && 0 != strncmp(hls_args.filename, "-", 2)) {
+        pFile = fopen(hls_args.filename, "r+b");
+        if (pFile) {
+            return pFile;
+        }
+        MSG_WARNING("resume: cannot reopen %s - starting fresh\n", hls_args.filename);
+    }
 
     if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
         // Set "stdout" to have binary mode:
@@ -63,12 +117,8 @@ static FILE* get_output_file(void)
         fflush(stdout);
     } else {
         char filename[MAX_FILENAME_LEN];
-        if (hls_args.filename) {
-            strcpy(filename, hls_args.filename);
-        }
-        else {
-            strcpy(filename, "000_hls_output.ts");
-        }
+        snprintf(filename, sizeof(filename), "%s",
+                 hls_args.filename ? hls_args.filename : "000_hls_output.ts");
 
         if (is_file_exists(filename)) {
             if (hls_args.force_overwrite) {
@@ -396,16 +446,69 @@ int main(int argc, char *argv[])
         }
     } else {
         int ret = -1;
-        FILE *out_file = get_output_file();
+        hls_resume_state_t *resume = NULL;
+        bool resuming = false;
+
+        if (hls_args.resume && media_playlist.is_endlist
+            && hls_args.filename && 0 != strncmp(hls_args.filename, "-", 2)) {
+            int total = 0, has_map = 0;
+            for (struct hls_media_segment *s = media_playlist.first_media_segment; s; s = s->next) {
+                if (s->is_map) {
+                    has_map = 1;
+                } else {
+                    total++;
+                }
+            }
+            uint64_t fp = playlist_fingerprint(&media_playlist,
+                              audio_media_playlist.first_media_segment ? &audio_media_playlist : NULL);
+            resume = resume_load(hls_args.filename, total, has_map, fp);
+            resuming = (resume && resume->done > 0);
+
+            if (resuming) {
+                /* The output file must be at least as large as the recorded
+                 * byte count, otherwise a truncate would zero-extend it. */
+                struct stat st;
+                if (0 != stat(hls_args.filename, &st) || (int64_t)st.st_size < resume->bytes) {
+                    MSG_WARNING("resume: %s is missing or smaller than expected - starting fresh\n", hls_args.filename);
+                    resume->done = 0;
+                    resume->bytes = 0;
+                    resuming = false;
+                }
+            }
+        }
+
+        FILE *out_file = get_output_file(resuming);
+        if (out_file && resuming) {
+            /* Drop any partially written tail, then position at EOF (== the
+             * resume offset after the truncate). fseek(SEEK_END) avoids
+             * needing a 64-bit absolute offset argument. */
+            fflush(out_file);
+#ifndef _MSC_VER
+            int trunc_err = ftruncate(fileno(out_file), (off_t)resume->bytes);
+#else
+            int trunc_err = _chsize_s(_fileno(out_file), (long long)resume->bytes);
+#endif
+            if (0 != trunc_err || 0 != fseek(out_file, 0, SEEK_END)) {
+                MSG_WARNING("resume: cannot position the output - starting fresh\n");
+                fclose(out_file);
+                resume->done = 0;
+                resume->bytes = 0;
+                /* Leave the partial file in place; get_output_file() overwrites
+                 * it under -f, or asks, rather than deleting it here. */
+                out_file = get_output_file(false);
+            }
+        }
+
         if (out_file) {
             write_ctx_t out_ctx = {priv_write, out_file};
             if (media_playlist.is_endlist) {
-                ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist);
+                ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist, resume);
             } else {
                 ret = download_live_hls(&out_ctx, &media_playlist);
             }
             fclose(out_file);
         }
+        free(resume);
         return ret ? 1 : 0;
     }
 

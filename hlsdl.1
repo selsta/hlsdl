@@ -74,6 +74,13 @@ AES key uri.
 Overwrite the output file without asking.
 .TP
 .B
+-R 
+Resume an interrupted VOD download. hlsdl keeps a
+.I <output>.hlsdl.resume
+sidecar while downloading; re-running with the same playlist and output file
+carries on from the last completed segment instead of starting over.
+.TP
+.B
 -F 
 Force ignore detection of DRM.
 .TP
