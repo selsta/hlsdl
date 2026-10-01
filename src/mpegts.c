@@ -428,7 +428,7 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
 bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt)
 {
     // maybe better will be to find PAT first and then we will know PMT PID
-    while (size > TS_PACKET_LENGTH)
+    while (size >= TS_PACKET_LENGTH)
     {
         if (TS_SYNC_BYTE == bufp[0])
         {
@@ -447,6 +447,7 @@ bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt)
         {
             MSG_WARNING("Missing sync byte!!!\n");
             bufp += 1;
+            size -= 1;
         }
     }
     return false;
