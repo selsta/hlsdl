@@ -170,6 +170,7 @@ size_t get_data_from_localfile(char* filename, char** out, int64_t range_offset,
             if (fseek(fp, range_offset, SEEK_SET))
             {
                 MSG_ERROR("%s\n", strerror(errno));
+                fclose(fp);
                 return -1;
             }
             readsize = range_size;
@@ -179,6 +180,8 @@ size_t get_data_from_localfile(char* filename, char** out, int64_t range_offset,
         if (fread(*out, 1, readsize, fp) != readsize) {
             MSG_ERROR("fread returned less bytes than required\n");
             free(*out);
+            *out = NULL;
+            fclose(fp);
             return -1;
         }
         (*out)[readsize] = 0;
@@ -297,8 +300,11 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
         if (type == STRING) {
             *out = strdup(chunk.memory);
         } else if (type == BINKEY) {
-            *out = malloc(KEYLEN);
-            *out = memcpy(*out, chunk.memory, KEYLEN);
+            *out = NULL;
+            if (chunk.size == KEYLEN) {
+                *out = malloc(KEYLEN);
+                *out = memcpy(*out, chunk.memory, KEYLEN);
+            }
         } else if (type == BINARY) {
             *out = malloc(chunk.size);
             // hack to remove 1x1 png as seen e.g. here:
