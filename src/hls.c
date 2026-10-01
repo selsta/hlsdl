@@ -524,6 +524,9 @@ int handle_hls_master_playlist(struct hls_master_playlist *ma)
             goto finish;
         }
         *end_ptr = '\0';
+        if (end_ptr > src && end_ptr[-1] == '\r') {
+            end_ptr[-1] = '\0';
+        }
         if (*src == '#') {
             url_expected = false;
             bitrate = 0;
