@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
             hls_media_playlist_t *me;
             for (me = master_playlist.media_playlist; me; me = me->next) {
                 if (sscanf(me->resolution, "%dx%d", &width, &height) < 2)
-                    break;
+                    continue;
                 if (width > hls_args.maxwidth && hls_args.maxwidth != -1)
                     continue;
                 if (height > hls_args.maxheight && hls_args.maxheight != -1)
@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
 
             if (has_audio_playlist) {
                 // print hls master playlist
-                int audio_choice = 0;
+                int audio_choice = -1;
                 int i = 1;
 
                 if (!selected_audio) {
@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
                         }
                     }
 
-                    if (audio_choice == 0) {
+                    if (audio_choice < 0) {
                         audio = master_playlist.audio;
                         i = 0;
                         while (audio) {
