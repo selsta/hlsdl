@@ -40,6 +40,7 @@ typedef struct hls_media_segment {
     int64_t size;
     int sequence_number;
     uint64_t duration_ms;
+    int encryptiontype;
     struct enc_aes128 enc_aes;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;

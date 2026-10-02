@@ -243,6 +243,41 @@ static int extend_url(char **url, const char *baseurl)
     }
 }
 
+/* Split one attribute without treating commas in quoted strings as separators. */
+static int next_media_attribute(char **source, char **name, char **value, bool *quoted)
+{
+    char *ptr = *source;
+    if (!*ptr)
+        return 0;
+    *name = ptr;
+    while (*ptr && *ptr != '=' && *ptr != ',')
+        ++ptr;
+    if (*ptr != '=' || ptr == *name)
+        return -1;
+    *ptr++ = '\0';
+    *quoted = *ptr == '"';
+    if (*quoted) {
+        *value = ++ptr;
+        ptr = strchr(ptr, '"');
+        if (!ptr)
+            return -1;
+        *ptr++ = '\0';
+        if (*ptr && *ptr != ',')
+            return -1;
+    } else {
+        *value = ptr;
+        while (*ptr && *ptr != ',')
+            ++ptr;
+    }
+    if (*ptr) {
+        *ptr++ = '\0';
+        if (!*ptr)
+            return -1;
+    }
+    *source = ptr;
+    return **value ? 1 : -1;
+}
+
 static int parse_decimal(const char **source, int64_t *value)
 {
     const char *ptr = *source;
@@ -287,61 +322,104 @@ static int resolve_byte_range(const char *url, int64_t size, int64_t *offset, hl
     return *offset > INT64_MAX - size ? -1 : 0;
 }
 
-static int parse_tag(hls_media_playlist_t *me, struct hls_media_segment *ms, char *tag, int64_t *seg_offset, int64_t *seg_size)
+static int parse_iv(const char *value, uint8_t iv[KEYLEN])
 {
-    int enc_type;
+    size_t len = strlen(value);
+    if (len < 3 || len > 2 + KEYLEN * 2 || value[0] != '0' || (value[1] != 'x' && value[1] != 'X'))
+        return -1;
+    memset(iv, 0, KEYLEN);
+    for (size_t i = 2; i < len; ++i) {
+        int digit;
+        if (value[i] >= '0' && value[i] <= '9')
+            digit = value[i] - '0';
+        else if (value[i] >= 'a' && value[i] <= 'f')
+            digit = value[i] - 'a' + 10;
+        else if (value[i] >= 'A' && value[i] <= 'F')
+            digit = value[i] - 'A' + 10;
+        else
+            return -1;
+        size_t nibble = KEYLEN * 2 - (len - 2) + i - 2;
+        iv[nibble / 2] |= (uint8_t)(digit << (nibble % 2 ? 0 : 4));
+    }
+    return 0;
+}
 
-    if (!strncmp(tag, "#EXT-X-KEY:METHOD=AES-128", 25)) {
-        enc_type = ENC_AES128;
-        me->enc_aes.iv_is_static = false;
-    } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES-CTR", 32)) {
-        enc_type = ENC_AES_SAMPLE_CTR;
-        me->enc_aes.iv_is_static = is_playlist_FPS(me->source);
-    } else if (!strncmp(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES", 28)) {
-        enc_type = ENC_AES_SAMPLE;
-        me->enc_aes.iv_is_static = is_playlist_FPS(me->source);
-    } else {
-        if (!strncmp(tag, "#EXTINF:", 8))
-            ms->duration_ms = get_duration_ms(tag + 8);
-        else if (!strcmp(tag, "#EXT-X-ENDLIST"))
-            me->is_endlist = true;
-        else if (!strncmp(tag, "#EXT-X-MEDIA-SEQUENCE:", 22)) {
-            const char *value = tag + 22;
-            int64_t sequence;
-            if (me->first_media_segment || parse_decimal(&value, &sequence) || *value || sequence > INT_MAX)
+static int parse_key(hls_media_playlist_t *me, char *attributes)
+{
+    char *name, *value, *method = NULL, *uri = NULL, *iv = NULL;
+    bool quoted;
+    int ret;
+    while ((ret = next_media_attribute(&attributes, &name, &value, &quoted)) > 0) {
+        if (!strcmp(name, "METHOD")) {
+            if (method || quoted)
                 return -1;
-            me->first_media_sequence = (int)sequence;
-        } else if (!strncmp(tag, "#EXT-X-TARGETDURATION:", 22))
-            me->target_duration_ms = get_duration_ms(tag + 22);
-        else if (!strncmp(tag, "#EXT-X-BYTERANGE:", 17))
-            return parse_byte_range(tag + 17, seg_size, seg_offset);
-        return 0;
-    }
-
-    me->encryption = true;
-    me->encryptiontype = enc_type;
-
-    char *link_to_key = malloc(strlen(tag) + strlen(me->url) + 10);
-    char iv_str[STRLEN_BTS(KEYLEN)] = "\0";
-    char sep = '\0';
-    if ((sscanf(tag, "#EXT-X-KEY:METHOD=AES-128,URI=\"%[^\"]\",IV=0%c%32[0-9a-f]", link_to_key, &sep, iv_str) > 0 ||
-         sscanf(tag, "#EXT-X-KEY:METHOD=SAMPLE-AES,URI=\"%[^\"]\",IV=0%c%32[0-9a-f]", link_to_key, &sep, iv_str) > 0))
-    {
-        if (sep == 'x' || sep == 'X')
-        {
-            uint8_t *iv_bin = malloc(KEYLEN);
-            str_to_bin(iv_bin, iv_str, KEYLEN);
-            memcpy(me->enc_aes.iv_value, iv_bin, KEYLEN);
-            me->enc_aes.iv_is_static = true;
-            free(iv_bin);
+            method = value;
+        } else if (!strcmp(name, "URI")) {
+            if (uri || !quoted)
+                return -1;
+            uri = value;
+        } else if (!strcmp(name, "IV")) {
+            if (iv || quoted)
+                return -1;
+            iv = value;
         }
-
-        extend_url(&link_to_key, me->url);
-
-        free(me->enc_aes.key_url);
-        me->enc_aes.key_url = strdup(link_to_key);
     }
-    free(link_to_key);
+    if (ret < 0 || !method)
+        return -1;
+    int type;
+    if (!strcmp(method, "NONE"))
+        type = ENC_NONE;
+    else if (!strcmp(method, "AES-128"))
+        type = ENC_AES128;
+    else if (!strcmp(method, "SAMPLE-AES"))
+        type = ENC_AES_SAMPLE;
+    else if (!strcmp(method, "SAMPLE-AES-CTR"))
+        type = ENC_AES_SAMPLE_CTR;
+    else
+        return -1;
+    if ((type == ENC_NONE && (uri || iv)) || (type != ENC_NONE && !uri))
+        return -1;
+
+    enc_aes128_t key = {0};
+    key.iv_is_static = type != ENC_AES128 && is_playlist_FPS(me->source);
+    if (iv) {
+        if (parse_iv(iv, key.iv_value))
+            return -1;
+        key.iv_is_static = true;
+    }
+    if (uri) {
+        key.key_url = strdup(uri);
+        if (!key.key_url)
+            return -1;
+        extend_url(&key.key_url, me->url);
+    }
+    free(me->enc_aes.key_url);
+    me->enc_aes = key;
+    me->encryptiontype = type;
+    if (type != ENC_NONE)
+        me->encryption = true;
+    return 0;
+}
+
+static int parse_tag(hls_media_playlist_t *me, hls_media_segment_t *ms, char *tag,
+                     int64_t *seg_offset, int64_t *seg_size)
+{
+    if (!strncmp(tag, "#EXT-X-KEY:", 11))
+        return parse_key(me, tag + 11);
+    if (!strncmp(tag, "#EXTINF:", 8))
+        ms->duration_ms = get_duration_ms(tag + 8);
+    else if (!strcmp(tag, "#EXT-X-ENDLIST"))
+        me->is_endlist = true;
+    else if (!strncmp(tag, "#EXT-X-MEDIA-SEQUENCE:", 22)) {
+        const char *value = tag + 22;
+        int64_t sequence;
+        if (me->first_media_segment || parse_decimal(&value, &sequence) || *value || sequence > INT_MAX)
+            return -1;
+        me->first_media_sequence = (int)sequence;
+    } else if (!strncmp(tag, "#EXT-X-TARGETDURATION:", 22))
+        me->target_duration_ms = get_duration_ms(tag + 22);
+    else if (!strncmp(tag, "#EXT-X-BYTERANGE:", 17))
+        return parse_byte_range(tag + 17, seg_size, seg_offset);
     return 0;
 }
 
@@ -385,17 +463,17 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
             line = NULL;
             extend_url(&ms->url, me->url);
             ms->sequence_number = me->first_media_sequence + (int)count;
-            if (me->encryptiontype == ENC_AES128 || me->encryptiontype == ENC_AES_SAMPLE) {
-                memcpy(ms->enc_aes.key_value, me->enc_aes.key_value, KEYLEN);
-                memcpy(ms->enc_aes.iv_value, me->enc_aes.iv_value, KEYLEN);
-                ms->enc_aes.key_url = strdup(me->enc_aes.key_url);
-                if (me->enc_aes.iv_is_static == false) {
-                    char iv_str[STRLEN_BTS(KEYLEN)];
-                    snprintf(iv_str, STRLEN_BTS(KEYLEN), "%032x\n", ms->sequence_number);
-                    uint8_t *iv_bin = malloc(KEYLEN);
-                    str_to_bin(iv_bin, iv_str, KEYLEN);
-                    memcpy(ms->enc_aes.iv_value, iv_bin, KEYLEN);
-                    free(iv_bin);
+            ms->encryptiontype = me->encryptiontype;
+            ms->enc_aes = me->enc_aes;
+            ms->enc_aes.key_url = me->enc_aes.key_url ? strdup(me->enc_aes.key_url) : NULL;
+            if (me->enc_aes.key_url && !ms->enc_aes.key_url)
+                goto error;
+            if (ms->encryptiontype != ENC_NONE && !ms->enc_aes.iv_is_static) {
+                memset(ms->enc_aes.iv_value, 0, KEYLEN);
+                uint32_t sequence = (uint32_t)ms->sequence_number;
+                for (int i = KEYLEN - 1; sequence; --i) {
+                    ms->enc_aes.iv_value[i] = (uint8_t)sequence;
+                    sequence >>= 8;
                 }
             }
             ms->size = seg_size;
@@ -448,6 +526,8 @@ int handle_hls_media_playlist(hls_media_playlist_t *me)
 {
     me->encryption = false;
     me->encryptiontype = ENC_NONE;
+    free(me->enc_aes.key_url);
+    memset(&me->enc_aes, 0, sizeof(me->enc_aes));
 
     if (!me->source) {
         size_t size = 0;
@@ -1479,9 +1559,9 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
                 break;
             }
 
-            if (me->encryption == true && me->encryptiontype == ENC_AES128) {
+            if (ms->encryptiontype == ENC_AES128) {
                 result = decrypt_aes128(ms, &seg);
-            } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+            } else if (ms->encryptiontype == ENC_AES_SAMPLE) {
                 result = decrypt_sample_aes(ms, &seg);
             }
             if (result) {
@@ -1533,7 +1613,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     return result;
 }
 
-static int vod_download_segment(void **psession, hls_media_playlist_t *me, struct hls_media_segment *ms, struct ByteBuffer *seg)
+static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg)
 {
     int retries = 0;
     int ret = 0;
@@ -1569,9 +1649,9 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
     }
 
     if (ret == 0) {
-        if (me->encryption == true && me->encryptiontype == ENC_AES128) {
+        if (ms->encryptiontype == ENC_AES128) {
             ret = decrypt_aes128(ms, seg);
-        } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
+        } else if (ms->encryptiontype == ENC_AES_SAMPLE) {
             ret = decrypt_sample_aes(ms, seg);
         }
     }
@@ -1654,7 +1734,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     }
 
     while(ms) {
-        if (0 != vod_download_segment(&session, me, ms, &seg)) {
+        if (vod_download_segment(&session, ms, &seg)) {
             ret = 1;
             break;
         }
@@ -1662,7 +1742,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
         uint8_t *first_video_packet = find_first_ts_packet(&seg);
         uint8_t *first_audio_packet = NULL;
         if (ms_audio) {
-            if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
+            if (vod_download_segment(&session, ms_audio, &seg_audio)) {
                 free(seg.data);
                 ret = 1;
                 break;
@@ -1725,7 +1805,7 @@ int print_enc_keys(hls_media_playlist_t *me)
 {
     struct hls_media_segment *ms = me->first_media_segment;
     while(ms) {
-        if (me->encryption == true) {
+        if (ms->encryptiontype != ENC_NONE) {
             fill_key_value(&(ms->enc_aes));
             MSG_PRINT("[AES-128]KEY: 0x");
             for(size_t count = 0; count < KEYLEN; count++) {
