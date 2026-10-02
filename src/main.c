@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
@@ -29,9 +30,11 @@ char* str_ecryption_type[] ={
 };
 
 
-static size_t priv_write(const uint8_t *data, size_t len, void *opaque) {
-    return fwrite(data, 1, len, opaque);
-}
+typedef struct output_file {
+    FILE *file;
+    char filename[MAX_FILENAME_LEN + 22];
+    bool failed;
+} output_file_t;
 
 static bool is_file_exists(const char *filename)
 {
@@ -46,11 +49,11 @@ static bool is_file_exists(const char *filename)
 #endif
 }
 
-static FILE* get_output_file(void)
+static FILE* get_output_file(const char *filename)
 {
     FILE *pFile = NULL;
 
-    if (hls_args.filename && 0 == strncmp(hls_args.filename, "-", 2)) {
+    if (strcmp(filename, "-") == 0) {
         // Set "stdout" to have binary mode:
         fflush(stdout);
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
@@ -62,19 +65,11 @@ static FILE* get_output_file(void)
 #endif
         fflush(stdout);
     } else {
-        char filename[MAX_FILENAME_LEN];
-        if (hls_args.filename) {
-            strcpy(filename, hls_args.filename);
-        }
-        else {
-            strcpy(filename, "000_hls_output.ts");
-        }
-
         if (is_file_exists(filename)) {
             if (hls_args.force_overwrite) {
                 if (remove(filename) != 0) {
                     MSG_ERROR("Error overwriting file");
-                    exit(1);
+                    return NULL;
                 }
             }
             else {
@@ -83,12 +78,12 @@ static FILE* get_output_file(void)
                 if (scanf("\n%c", &userchoice) && userchoice == 'y') {
                     if (remove(filename) != 0) {
                         MSG_ERROR("Error overwriting file");
-                        exit(1);
+                        return NULL;
                     }
                 }
                 else {
                     MSG_WARNING("Choose a different filename. Exiting.\n");
-                    exit(0);
+                    return NULL;
                 }
             }
         }
@@ -99,9 +94,76 @@ static FILE* get_output_file(void)
     if (pFile == NULL)
     {
         MSG_ERROR("Error can not open output file\n");
-        exit(1);
+        return NULL;
     }
     return pFile;
+}
+
+static int begin_output_segment(uint64_t index, void *opaque)
+{
+    output_file_t *out = opaque;
+    const char *path = hls_args.filename ? hls_args.filename : "hls_output.ts";
+    const char *base = strrchr(path, '/');
+#ifdef _WIN32
+    const char *backslash = strrchr(path, '\\');
+    if (backslash && (!base || backslash > base)) {
+        base = backslash;
+    }
+#endif
+    base = base ? base + 1 : path;
+#ifdef _WIN32
+    if (base == path && path[0] && path[1] == ':') {
+        base += 2;
+    }
+#endif
+    if (!*base) {
+        MSG_ERROR("Output filename must include a basename.\n");
+        return 1;
+    }
+    int len = snprintf(out->filename, sizeof(out->filename), "%.*s%03"PRIu64"_%s",
+        (int)(base - path), path, index, base);
+    if (len < 0 || (size_t)len >= sizeof(out->filename)) {
+        MSG_ERROR("Output filename is too long.\n");
+        return 1;
+    }
+    return 0;
+}
+
+static size_t priv_write(const uint8_t *data, size_t len, void *opaque)
+{
+    output_file_t *out = opaque;
+    if (out->failed) {
+        return 0;
+    }
+    if (!out->file) {
+        out->file = get_output_file(out->filename);
+        if (!out->file) {
+            out->failed = true;
+            return 0;
+        }
+    }
+    size_t written = fwrite(data, 1, len, out->file);
+    if (written != len) {
+        MSG_ERROR("Could not write output file.\n");
+        out->failed = true;
+    }
+    return written;
+}
+
+static int finish_output_segment(bool success, void *opaque)
+{
+    output_file_t *out = opaque;
+    if (hls_args.separate_segments && out->file) {
+        if (fclose(out->file)) {
+            MSG_ERROR("Could not finish writing output file.\n");
+            out->failed = true;
+        }
+        out->file = NULL;
+        if ((!success || out->failed) && remove(out->filename)) {
+            MSG_WARNING("Could not remove incomplete output file: %s\n", out->filename);
+        }
+    }
+    return out->failed ? 1 : 0;
 }
 
 static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_url, int tries)
@@ -147,6 +209,12 @@ int main(int argc, char *argv[])
     if (parse_argv(argc, argv)) {
         MSG_WARNING("No files passed. Exiting.\n");
         return 0;
+    }
+
+    if (hls_args.separate_segments && hls_args.filename &&
+        strcmp(hls_args.filename, "-") == 0) {
+        MSG_ERROR("Separate segments cannot be written to stdout.\n");
+        return 1;
     }
 
     MSG_DBG("Loglevel: %d\n", hls_args.loglevel);
@@ -415,16 +483,27 @@ int main(int argc, char *argv[])
         }
     } else {
         int ret = -1;
-        FILE *out_file = get_output_file();
-        if (out_file) {
-            write_ctx_t out_ctx = {priv_write, out_file};
+        output_file_t output = {0};
+        if (!hls_args.separate_segments) {
+            output.file = get_output_file(hls_args.filename ? hls_args.filename : "000_hls_output.ts");
+        }
+        if (output.file || hls_args.separate_segments) {
+            write_ctx_t out_ctx = {
+                .write = priv_write,
+                .opaque = &output,
+                .begin_segment = hls_args.separate_segments ? begin_output_segment : NULL,
+                .end_segment = finish_output_segment,
+            };
             if (media_playlist.is_endlist) {
                 ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist);
             } else {
                 ret = download_live_hls(&out_ctx, &media_playlist);
             }
-            if (fclose(out_file)) {
+            if (output.file && fclose(output.file)) {
                 MSG_ERROR("Could not finish writing output file.\n");
+                ret = 1;
+            }
+            if (output.failed) {
                 ret = 1;
             }
         }

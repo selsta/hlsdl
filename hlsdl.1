@@ -52,6 +52,12 @@ Verbose more information. Repeating this option increases verbosity each time.
 .BI -o " file
 Name of output file ("-" alias for stdout).
 .TP
+.B
+-m
+Save each segment to a numbered file. With -o video.ts, filenames are
+000_video.ts, 001_video.ts, and so on. Cannot be used with -o -.
+Fragmented MP4 files each include their initialization data.
+.TP
 .BI -u " user_agent
 Set custom HTTP User-Agent header.
 .TP

@@ -18,6 +18,8 @@ extern "C" {
 typedef struct write_ctx {
     size_t (*write) ( const uint8_t *data, size_t len, void *opaque);
     void *opaque;
+    int (*begin_segment)(uint64_t index, void *opaque);
+    int (*end_segment)(bool success, void *opaque);
 } write_ctx_t;
 
 typedef struct ByteBuffer {
@@ -42,6 +44,7 @@ struct hls_args {
     int refresh_delay_sec;
     int segment_download_retries;
     bool ignore_download_errors;
+    bool separate_segments;
     int open_max_retries;
     char *filename;
     char *url;

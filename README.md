@@ -72,10 +72,13 @@ docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 ```
 
 Output keeps the original container format. Use `-o video.mp4` for fragmented MP4.
-Fragmented MP4 discontinuities and changes to initialization data are not supported.
+Combining fragmented MP4 segments across discontinuities or initialization data changes is not supported.
 Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
 
 Use `-I` to skip failed VOD segment downloads after retries. The output will be incomplete.
+
+Use `-m -o video.ts` to save `000_video.ts`, `001_video.ts`, and so on.
+Each fragmented MP4 file includes its initialization data.
 
 ---------------------------
 ```
@@ -90,6 +93,8 @@ Use `-I` to skip failed VOD segment downloads after retries. The output will be 
 -v ... Verbose more information.
 
 -o ... Choose name of output file ("-" alias for stdout).
+
+-m ... Save each segment to a numbered file (cannot be used with -o -).
 
 -u ... Set custom HTTP User-Agent header.
 

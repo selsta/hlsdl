@@ -1568,15 +1568,24 @@ static int write_init_section(void **session, const hls_media_segment_t *ms,
     write_ctx_t *out, init_section_state_t *state, int64_t *download_size)
 {
     const hls_init_section_t *section = ms->init_section;
+    bool separate = out->begin_segment != NULL;
     if (!section) {
-        if (state->section) {
+        if (state->section && !separate) {
             MSG_ERROR("Media segment is missing its EXT-X-MAP.\n");
             return 1;
         }
         return 0;
     }
     if (state->section && same_init_section(section, state->section) &&
-        state->discontinuity_sequence == ms->discontinuity_sequence) {
+        (separate || state->discontinuity_sequence == ms->discontinuity_sequence)) {
+        if (separate) {
+            size_t written = out->write(state->data.data, state->data.len, out->opaque);
+            *download_size += written;
+            if (written != (size_t)state->data.len) {
+                MSG_ERROR("Could not write initialization section.\n");
+                return 1;
+            }
+        }
         return 0;
     }
 
@@ -1605,7 +1614,7 @@ static int write_init_section(void **session, const hls_media_segment_t *ms,
 
     bool is_ts = init_section_is_ts(&data);
     bool write_section = true;
-    if (state->section && !(is_ts && init_section_is_ts(&state->data))) {
+    if (!separate && state->section && !(is_ts && init_section_is_ts(&state->data))) {
         if (state->discontinuity_sequence != ms->discontinuity_sequence ||
             data.len != state->data.len || memcmp(data.data, state->data.data, data.len)) {
             MSG_ERROR("Changing non-TS initialization sections or discontinuities requires remuxing.\n");
@@ -1614,7 +1623,7 @@ static int write_init_section(void **session, const hls_media_segment_t *ms,
         }
         // A new URI or key can still describe the same initialization bytes.
         write_section = false;
-    } else if (!state->section && state->wrote_media && !is_ts) {
+    } else if (!separate && !state->section && state->wrote_media && !is_ts) {
         MSG_ERROR("Introducing a non-TS initialization section after media requires remuxing.\n");
         free(data.data);
         return 1;
@@ -1704,6 +1713,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     int64_t download_size = 0;
     time_t repTime = 0;
     bool download = true;
+    uint64_t segment_index = 0;
     int result = 0;
     init_section_state_t init_state = {0};
     while(download) {
@@ -1738,12 +1748,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             continue;
         }
 
-        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size)) {
-            media_segment_cleanup(ms);
-            result = 1;
-            break;
-        }
-
+        uint64_t index = segment_index++;
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
         int retries = 0;
         do {
@@ -1751,7 +1756,6 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             memset(&seg, 0x00, sizeof(seg));
             size_t size = 0;
             long http_code = get_data_from_url_with_session(&session, ms->url, (char **)&(seg.data), &size, BINARY, NULL, ms->offset, ms->size);
-            seg.len = (int)size;
             if (!(http_code == 200 || (http_code == 206 && (ms->size > -1 || hls_args.accept_partial_content)))) {
                 int first_media_sequence = 0;
                 if (seg.data) {
@@ -1782,6 +1786,14 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
                 }
             }
 
+            if (!size || size > INT_MAX) {
+                MSG_ERROR("Invalid segment response size.\n");
+                free(seg.data);
+                result = 1;
+                download = false;
+                break;
+            }
+            seg.len = (int)size;
             downloaded_duration_ms += ms->duration_ms;
             if (hls_args.live_duration_sec > 0 && downloaded_duration_ms > hls_args.live_duration_sec * 1000) {
                 download = false;
@@ -1794,18 +1806,36 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             } else if (ms->encryptiontype == ENC_AES_SAMPLE) {
                 result = decrypt_sample_aes(ms, &seg);
             }
+            if (!result && seg.len <= 0) {
+                MSG_ERROR("Empty decrypted segment.\n");
+                result = 1;
+            }
             if (result) {
                 free(seg.data);
                 download = false;
                 break;
             }
-            size_t written = out_ctx->write(seg.data, seg.len, out_ctx->opaque);
-            download_size += written;
-            if (written != (size_t)seg.len) {
+            if (out_ctx->begin_segment && out_ctx->begin_segment(index, out_ctx->opaque)) {
                 result = 1;
-                download = false;
             }
-            init_state.wrote_media = true;
+            if (!result) {
+                result = write_init_section(&session, ms, out_ctx, &init_state, &download_size);
+            }
+            if (!result) {
+                size_t written = out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+                download_size += written;
+                if (written != (size_t)seg.len) {
+                    result = 1;
+                }
+            }
+            if (out_ctx->end_segment && out_ctx->end_segment(!result, out_ctx->opaque)) {
+                result = 1;
+            }
+            if (result) {
+                download = false;
+            } else {
+                init_state.wrote_media = true;
+            }
             free(seg.data);
 
             set_fresh_connect_http_session(session, 0);
@@ -1971,6 +2001,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
 
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
+    uint64_t segment_index = 0;
     init_section_state_t init_state = {0};
 
     struct hls_media_segment *ms = me->first_media_segment;
@@ -1984,6 +2015,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     }
 
     while(ms) {
+        uint64_t index = segment_index++;
         struct ByteBuffer seg = {0};
         struct ByteBuffer seg_audio = {0};
         segment_result_t segment_result = vod_download_segment(&session, ms, &seg, false);
@@ -2005,11 +2037,19 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
             break;
         }
 
-        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size)) {
+        if ((out_ctx->begin_segment && out_ctx->begin_segment(index, out_ctx->opaque)) ||
+            write_init_section(&session, ms, out_ctx, &init_state, &download_size)) {
             free(seg.data);
             free(seg_audio.data);
+            if (out_ctx->end_segment) {
+                out_ctx->end_segment(false, out_ctx->opaque);
+            }
             ret = 1;
             break;
+        }
+        if (out_ctx->begin_segment && ms_audio) {
+            memset(&merge_context, 0, sizeof(merge_context));
+            merge_context.out = out_ctx;
         }
         uint8_t *first_video_packet = find_first_ts_packet(&seg);
         uint8_t *first_audio_packet = NULL;
@@ -2041,6 +2081,9 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
                 MSG_ERROR("Could not write media segment.\n");
                 ret = 1;
             }
+        }
+        if (out_ctx->end_segment && out_ctx->end_segment(!ret, out_ctx->opaque)) {
+            ret = 1;
         }
         if (!ret) {
             init_state.wrote_media = true;

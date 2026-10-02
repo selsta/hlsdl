@@ -28,6 +28,7 @@ static void print_help(const char *filename)
            "-A ... Select audio language.\n"
            "-v ... Verbose more information.\n"
            "-o ... Choose name of output file (\"-\" alias for stdout).\n"
+           "-m ... Save each segment to a numbered file.\n"
            "-u ... Set custom HTTP User-Agent header.\n"
            "-h ... Set custom HTTP header.\n"
            "-p ... Set proxy uri.\n"
@@ -56,7 +57,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:Ie:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:mu:h:s:i:r:w:Ie:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -120,6 +121,9 @@ int parse_argv(int argc, char * const argv[])
                 hls_args.filename = optarg;
             else
                 MSG_PRINT("Output filename is too long. Using default filename instead.\n");
+            break;
+        case 'm':
+            hls_args.separate_segments = true;
             break;
         case 't':
             hls_args.dump_ts_urls = true;
