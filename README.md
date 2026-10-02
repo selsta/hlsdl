@@ -6,52 +6,62 @@ This program downloads .m3u8 playlists containing MPEG-2 Transport Streams or fr
 Requirements
 ------------
 
-This program requires libcurl, OpenSSL's libcrypto, and POSIX threads.
+CMake 3.21+, a C11 compiler, libcurl, OpenSSL (libcrypto), and POSIX threads.
 
 Build
 -----
 
 ![hlsdl build](https://github.com/selsta/hlsdl/workflows/hlsdl%20build/badge.svg)
 
-Build with CMake 3.21 or newer and a C11 compiler:
+### Linux and macOS
+
+Install the dependencies:
+
+- Debian/Ubuntu: `sudo apt install build-essential cmake libcurl4-openssl-dev libssl-dev`
+- macOS: `brew install cmake openssl`
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-cmake --install build
 ```
 
-The executable is `build/hlsdl`. Installation is optional. Use
-`-DCMAKE_INSTALL_PREFIX=/your/prefix` when configuring to change its destination.
+Run `build/hlsdl`, or install with `cmake --install build`.
 
-On Debian/Ubuntu, install `build-essential cmake libcurl4-openssl-dev libssl-dev`.
-On macOS, install `cmake openssl` with Homebrew. If OpenSSL is not found, add
+If OpenSSL is not found on macOS, add
 `-DOPENSSL_ROOT_DIR="$(brew --prefix openssl)"` to the configure command.
 
-Windows with [MSYS2](https://www.msys2.org/): run these commands in the UCRT64 shell,
-then build with `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release` and
-`cmake --build build`:
+### Windows (MSYS2)
+
+Use the [MSYS2](https://www.msys2.org/) UCRT64 shell:
 
 ```sh
 pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
     mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-openssl
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
 
-Run `build/hlsdl.exe` from the UCRT64 shell so its dependency DLLs can be found.
+Run `build/hlsdl.exe` from the same shell.
 
-For MSVC, install the dependencies with [vcpkg](https://github.com/microsoft/vcpkg)
-and run these commands in PowerShell, with `VCPKG_ROOT` pointing to vcpkg:
+### Windows (MSVC)
+
+Set `VCPKG_ROOT` to your [vcpkg](https://github.com/microsoft/vcpkg) installation
+and run in PowerShell:
 
 ```powershell
 & "$env:VCPKG_ROOT/vcpkg.exe" install curl openssl pthreads --triplet x64-windows
-cmake -S . -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+cmake -S . -B build -A x64 `
+    "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 cmake --build build --config Release
 ```
 
-The executable is `build/Release/hlsdl.exe`.
+Run `build/Release/hlsdl.exe`.
 
-Docker: `docker build -t hlsdl:latest .`
+### Docker
 
+```sh
+docker build -t hlsdl:latest .
+```
 
 Usage and Options
 -----------------
