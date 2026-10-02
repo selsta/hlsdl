@@ -1136,7 +1136,9 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
 {
     // The AES128 method encrypts whole segments.
     // Simply decrypting them is enough.
-    fill_key_value(&(s->enc_aes));
+    if (fill_key_value(&(s->enc_aes)) || buf->len <= 0 || buf->len % KEYLEN) {
+        return 1;
+    }
 
     void *ctx = AES128_CBC_CTX_new();
     /* some AES-128 encrypted segments could be not correctly padded
@@ -1147,8 +1149,8 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
      */
 #if 1
     int out_size = 0;
-    AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, true);
-    AES128_CBC_DecryptPadded(ctx, buf->data, buf->data, buf->len, &out_size);
+    int decrypted = ctx && AES128_CBC_DecryptInit(ctx, s->enc_aes.key_value, s->enc_aes.iv_value, true) &&
+        AES128_CBC_DecryptPadded(ctx, buf->data, buf->data, buf->len, &out_size);
     // decoded data size could be less then input because of the padding
     buf->len = out_size;
 #else
@@ -1156,7 +1158,7 @@ static int decrypt_aes128(hls_media_segment_t *s, ByteBuffer_t *buf)
     AES128_CBC_DecryptUpdate(ctx, buf->data, buf->data, buf->len);
 #endif
     AES128_CBC_free(ctx);
-    return 0;
+    return decrypted ? 0 : 1;
 }
 
 static void *hls_playlist_update_thread(void *arg)
@@ -1367,6 +1369,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     int64_t download_size = 0;
     time_t repTime = 0;
     bool download = true;
+    int result = 0;
     while(download) {
 
         pthread_mutex_lock(&media_playlist_mtx);
@@ -1440,11 +1443,21 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             }
 
             if (me->encryption == true && me->encryptiontype == ENC_AES128) {
-                decrypt_aes128(ms, &seg);
+                result = decrypt_aes128(ms, &seg);
             } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-                decrypt_sample_aes(ms, &seg);
+                result = decrypt_sample_aes(ms, &seg);
             }
-            download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+            if (result) {
+                free(seg.data);
+                download = false;
+                break;
+            }
+            size_t written = out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+            download_size += written;
+            if (written != (size_t)seg.len) {
+                result = 1;
+                download = false;
+            }
             free(seg.data);
 
             set_fresh_connect_http_session(session, 0);
@@ -1480,7 +1493,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
         clean_http_session(session);
     }
 
-    return 0;
+    return result;
 }
 
 static int vod_download_segment(void **psession, hls_media_playlist_t *me, struct hls_media_segment *ms, struct ByteBuffer *seg)
@@ -1520,9 +1533,9 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
 
     if (ret == 0) {
         if (me->encryption == true && me->encryptiontype == ENC_AES128) {
-            decrypt_aes128(ms, seg);
+            ret = decrypt_aes128(ms, seg);
         } else if (me->encryption == true && me->encryptiontype == ENC_AES_SAMPLE) {
-            decrypt_sample_aes(ms, seg);
+            ret = decrypt_sample_aes(ms, seg);
         }
     }
 
@@ -1534,6 +1547,10 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
         set_fresh_connect_http_session(*psession, 0);
     }
 
+    if (ret) {
+        free(seg->data);
+        seg->data = NULL;
+    }
     return ret;
 }
 
@@ -1601,6 +1618,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
 
     while(ms) {
         if (0 != vod_download_segment(&session, me, ms, &seg)) {
+            ret = 1;
             break;
         }
 
@@ -1608,6 +1626,8 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
         uint8_t *first_audio_packet = NULL;
         if (ms_audio) {
             if ( 0 != vod_download_segment(&session, me_audio, ms_audio, &seg_audio)) {
+                free(seg.data);
+                ret = 1;
                 break;
             }
             first_audio_packet = find_first_ts_packet(&seg_audio);
@@ -1626,7 +1646,12 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
                 audio_len
             );
         } else {
-            download_size += out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+            size_t written = out_ctx->write(seg.data, seg.len, out_ctx->opaque);
+            download_size += written;
+            if (written != (size_t)seg.len) {
+                MSG_ERROR("Could not write media segment.\n");
+                ret = 1;
+            }
         }
 
         if (ms_audio) {
@@ -1635,6 +1660,9 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
         }
 
         free(seg.data);
+        if (ret) {
+            break;
+        }
 
         downloaded_duration_ms += ms->duration_ms;
 
@@ -1788,11 +1816,13 @@ int fill_key_value(struct enc_aes128 *es)
 
             if (http_code != 200) {
                 MSG_ERROR("Getting key-file [%s] failed http_code[%d].\n", es->key_url, http_code);
+                free(key_value);
                 return 1;
             }
 
             if (size != KEYLEN) {
-                MSG_ERROR("Wrong length key-file. Expected %u bytes but got %u.\n", KEYLEN, size);
+                MSG_ERROR("Wrong length key-file. Expected %u bytes but got %zu.\n", KEYLEN, size);
+                free(key_value);
                 return 1;
             }
 

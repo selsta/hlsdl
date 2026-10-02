@@ -404,7 +404,10 @@ int main(int argc, char *argv[])
             } else {
                 ret = download_live_hls(&out_ctx, &media_playlist);
             }
-            fclose(out_file);
+            if (fclose(out_file)) {
+                MSG_ERROR("Could not finish writing output file.\n");
+                ret = 1;
+            }
         }
         return ret ? 1 : 0;
     }
