@@ -1207,8 +1207,14 @@ static void *hls_playlist_update_thread(void *arg)
         // download live hls can interrupt waiting
         ts.tv_sec =  time(NULL) + refresh_delay_s;
         pthread_mutex_lock(media_playlist_mtx);
-        pthread_cond_timedwait(media_playlist_refresh_cond, media_playlist_mtx, &ts);
+        if (!updater_params->stop) {
+            pthread_cond_timedwait(media_playlist_refresh_cond, media_playlist_mtx, &ts);
+        }
+        bool stop = updater_params->stop;
         pthread_mutex_unlock(media_playlist_mtx);
+        if (stop) {
+            break;
+        }
 
         // update playlist
         hls_media_playlist_t new_me;
@@ -1243,6 +1249,7 @@ static void *hls_playlist_update_thread(void *arg)
                             ms->prev = NULL;
 
                             if (me->last_media_segment) {
+                                ms->prev = me->last_media_segment;
                                 me->last_media_segment->next = ms;
                             } else {
                                 assert(me->first_media_segment == NULL);
@@ -1270,7 +1277,7 @@ static void *hls_playlist_update_thread(void *arg)
                         ms = ms->next;
                     }
                 }
-                if (list_extended) {
+                if (list_extended || is_endlist) {
                     pthread_cond_signal(media_playlist_empty_cond);
                 }
                 pthread_mutex_unlock(media_playlist_mtx);
@@ -1368,6 +1375,8 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             me->first_media_segment = ms->next;
             if (me->first_media_segment) {
                 me->first_media_segment->prev = NULL;
+            } else {
+                me->last_media_segment = NULL;
             }
         }
         else {
@@ -1426,7 +1435,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
             downloaded_duration_ms += ms->duration_ms;
             if (hls_args.live_duration_sec > 0 && downloaded_duration_ms > hls_args.live_duration_sec * 1000) {
                 download = false;
-                pthread_cancel(thread);
+                free(seg.data);
                 break;
             }
 
@@ -1452,6 +1461,10 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
         media_segment_cleanup(ms);
     }
 
+    pthread_mutex_lock(&media_playlist_mtx);
+    updater_params.stop = true;
+    pthread_cond_signal(&media_playlist_refresh_cond);
+    pthread_mutex_unlock(&media_playlist_mtx);
     pthread_join(thread, &ret);
     pthread_mutex_destroy(&media_playlist_mtx);
 
