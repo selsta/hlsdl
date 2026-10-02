@@ -379,6 +379,18 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    if (audio_media_playlist.orig_url) {
+        hls_media_playlist_t *playlists[] = {&media_playlist, &audio_media_playlist};
+        for (size_t i = 0; i < sizeof(playlists) / sizeof(playlists[0]); ++i) {
+            for (hls_media_segment_t *ms = playlists[i]->first_media_segment; ms; ms = ms->next) {
+                if (ms->init_section) {
+                    MSG_ERROR("EXT-X-MAP with separate audio requires remuxing and is not supported.\n");
+                    return 1;
+                }
+            }
+        }
+    }
+
     MSG_PRINT("HLS Stream is %s encrypted.\n",
                   str_ecryption_type[media_playlist.encryptiontype]);
 
@@ -386,7 +398,14 @@ int main(int argc, char *argv[])
 
     if (hls_args.dump_ts_urls) {
         struct hls_media_segment *ms = media_playlist.first_media_segment;
+        const hls_init_section_t *last_init = NULL;
         while(ms) {
+            if (ms->init_section && (!last_init ||
+                strcmp(ms->init_section->url, last_init->url) ||
+                ms->init_section->offset != last_init->offset || ms->init_section->size != last_init->size)) {
+                MSG_PRINT("%s\n", ms->init_section->url);
+                last_init = ms->init_section;
+            }
             MSG_PRINT("%s\n", ms->url);
             ms = ms->next;
         }

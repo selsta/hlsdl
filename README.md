@@ -1,7 +1,7 @@
 hlsdl
 =====
 
-This program converts .m3u8 playlists (using fragmented MPEG-2 Transport Streams) to a .ts video. It supports decryption of both AES-128 and SAMPLE-AES encryption.
+This program downloads .m3u8 playlists containing MPEG-2 Transport Streams or fragmented MP4. It supports AES-128 decryption and SAMPLE-AES decryption for MPEG-2 Transport Streams.
 
 Requirements
 ------------
@@ -29,6 +29,10 @@ Usage and Options
 ```
 docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 ```
+
+Output keeps the original container format; use `-o video.mp4` for fragmented MP4.
+Fragmented MP4 discontinuities and changes to initialization data are not supported.
+Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
 
 ---------------------------
 ```
@@ -85,8 +89,7 @@ docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 
 ToDo
 -----
-* support for Fragmented MPEG-4 playlist
-* support for EXT-X-MAP in the MPEG-2 Transport Streams playlist
+* remux fragmented MP4 discontinuities and separate audio renditions
 
 Ideas
 -----

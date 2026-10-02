@@ -243,6 +243,32 @@ static int extend_url(char **url, const char *baseurl)
     }
 }
 
+void hls_init_section_free(hls_init_section_t *section)
+{
+    if (section) {
+        free(section->url);
+        free(section->enc_aes.key_url);
+        free(section);
+    }
+}
+
+hls_init_section_t *hls_init_section_clone(const hls_init_section_t *section)
+{
+    if (!section)
+        return NULL;
+    hls_init_section_t *copy = malloc(sizeof(*copy));
+    if (!copy)
+        return NULL;
+    *copy = *section;
+    copy->url = strdup(section->url);
+    copy->enc_aes.key_url = section->enc_aes.key_url ? strdup(section->enc_aes.key_url) : NULL;
+    if (!copy->url || (section->enc_aes.key_url && !copy->enc_aes.key_url)) {
+        hls_init_section_free(copy);
+        return NULL;
+    }
+    return copy;
+}
+
 /* Split one attribute without treating commas in quoted strings as separators. */
 static int next_media_attribute(char **source, char **name, char **value, bool *quoted)
 {
@@ -401,11 +427,62 @@ static int parse_key(hls_media_playlist_t *me, char *attributes)
     return 0;
 }
 
+static int parse_map(hls_media_playlist_t *me, char *attributes, hls_init_section_t **current)
+{
+    char *name, *value, *uri = NULL, *range = NULL;
+    bool quoted;
+    int ret;
+    while ((ret = next_media_attribute(&attributes, &name, &value, &quoted)) > 0) {
+        if (!strcmp(name, "URI")) {
+            if (uri || !quoted)
+                return -1;
+            uri = value;
+        } else if (!strcmp(name, "BYTERANGE")) {
+            if (range || !quoted)
+                return -1;
+            range = value;
+        }
+    }
+    if (ret < 0 || !uri)
+        return -1;
+    if (me->encryptiontype == ENC_AES128 && !me->enc_aes.iv_is_static) {
+        MSG_ERROR("AES-128 EXT-X-MAP requires an explicit IV.\n");
+        return -1;
+    }
+    if (me->encryptiontype == ENC_AES_SAMPLE || me->encryptiontype == ENC_AES_SAMPLE_CTR) {
+        MSG_ERROR("SAMPLE-AES encryption with EXT-X-MAP is not supported.\n");
+        return -1;
+    }
+    hls_init_section_t section = {0};
+    section.url = strdup(uri);
+    if (!section.url)
+        return -1;
+    extend_url(&section.url, me->url);
+    section.size = -1;
+    section.encryptiontype = me->encryptiontype;
+    section.enc_aes = me->enc_aes;
+    /* MAP ranges require an explicit offset and do not advance media ranges. */
+    if (range && (parse_byte_range(range, &section.size, &section.offset) || section.offset < 0)) {
+        free(section.url);
+        return -1;
+    }
+    hls_init_section_t *copy = hls_init_section_clone(&section);
+    free(section.url);
+    if (!copy)
+        return -1;
+    hls_init_section_free(*current);
+    *current = copy;
+    return 0;
+}
+
 static int parse_tag(hls_media_playlist_t *me, hls_media_segment_t *ms, char *tag,
-                     int64_t *seg_offset, int64_t *seg_size)
+                     int64_t *seg_offset, int64_t *seg_size, hls_init_section_t **section,
+                     int *discontinuity_sequence)
 {
     if (!strncmp(tag, "#EXT-X-KEY:", 11))
         return parse_key(me, tag + 11);
+    if (!strncmp(tag, "#EXT-X-MAP:", 11))
+        return parse_map(me, tag + 11, section);
     if (!strncmp(tag, "#EXTINF:", 8))
         ms->duration_ms = get_duration_ms(tag + 8);
     else if (!strcmp(tag, "#EXT-X-ENDLIST"))
@@ -420,15 +497,28 @@ static int parse_tag(hls_media_playlist_t *me, hls_media_segment_t *ms, char *ta
         me->target_duration_ms = get_duration_ms(tag + 22);
     else if (!strncmp(tag, "#EXT-X-BYTERANGE:", 17))
         return parse_byte_range(tag + 17, seg_size, seg_offset);
+    else if (!strncmp(tag, "#EXT-X-DISCONTINUITY-SEQUENCE:", 30)) {
+        const char *value = tag + 30;
+        int64_t sequence;
+        if (me->first_media_segment || parse_decimal(&value, &sequence) || *value || sequence > INT_MAX)
+            return -1;
+        *discontinuity_sequence = (int)sequence;
+    } else if (!strcmp(tag, "#EXT-X-DISCONTINUITY")) {
+        if (*discontinuity_sequence == INT_MAX)
+            return -1;
+        ++*discontinuity_sequence;
+    }
     return 0;
 }
 
 static int media_playlist_get_links(hls_media_playlist_t *me)
 {
     hls_media_segment_t *ms = NULL;
+    hls_init_section_t *section = NULL;
     const char *src = me->source;
     char *line = NULL;
     int64_t seg_offset = -1, seg_size = -1;
+    int discontinuity_sequence = 0;
     int64_t count = 0;
 
     MSG_PRINT("> START media_playlist_get_links\n");
@@ -452,7 +542,7 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                 goto error;
         }
         if (line[0] == '#') {
-            if (parse_tag(me, ms, line, &seg_offset, &seg_size)) {
+            if (parse_tag(me, ms, line, &seg_offset, &seg_size, &section, &discontinuity_sequence)) {
                 MSG_ERROR("Invalid media playlist tag.\n");
                 goto error;
             }
@@ -463,7 +553,12 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
             line = NULL;
             extend_url(&ms->url, me->url);
             ms->sequence_number = me->first_media_sequence + (int)count;
+            ms->discontinuity_sequence = discontinuity_sequence;
             ms->encryptiontype = me->encryptiontype;
+            if (section && (ms->encryptiontype == ENC_AES_SAMPLE || ms->encryptiontype == ENC_AES_SAMPLE_CTR)) {
+                MSG_ERROR("SAMPLE-AES encryption with EXT-X-MAP is not supported.\n");
+                goto error;
+            }
             ms->enc_aes = me->enc_aes;
             ms->enc_aes.key_url = me->enc_aes.key_url ? strdup(me->enc_aes.key_url) : NULL;
             if (me->enc_aes.key_url && !ms->enc_aes.key_url)
@@ -476,6 +571,9 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
                     sequence >>= 8;
                 }
             }
+            ms->init_section = hls_init_section_clone(section);
+            if (section && !ms->init_section)
+                goto error;
             ms->size = seg_size;
             ms->offset = seg_offset;
             if (resolve_byte_range(ms->url, ms->size, &ms->offset, me->last_media_segment)) {
@@ -497,12 +595,14 @@ static int media_playlist_get_links(hls_media_playlist_t *me)
         line = NULL;
     }
     media_segment_cleanup(ms);
+    hls_init_section_free(section);
     MSG_PRINT("> END media_playlist_get_links\n");
     return 0;
 
 error:
     free(line);
     media_segment_cleanup(ms);
+    hls_init_section_free(section);
     while ((ms = me->first_media_segment)) {
         me->first_media_segment = ms->next;
         media_segment_cleanup(ms);
@@ -1414,6 +1514,121 @@ static void *hls_playlist_update_thread(void *arg)
     return NULL;
 }
 
+typedef struct init_section_state {
+    hls_init_section_t *section;
+    ByteBuffer_t data;
+    int discontinuity_sequence;
+    bool wrote_media;
+} init_section_state_t;
+
+static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map);
+
+static bool same_init_section(const hls_init_section_t *a, const hls_init_section_t *b)
+{
+    if (a->offset != b->offset || a->size != b->size ||
+        a->encryptiontype != b->encryptiontype || strcmp(a->url, b->url)) {
+        return false;
+    }
+    if (a->encryptiontype == ENC_AES128) {
+        return a->enc_aes.key_url && b->enc_aes.key_url &&
+            !strcmp(a->enc_aes.key_url, b->enc_aes.key_url) &&
+            !memcmp(a->enc_aes.iv_value, b->enc_aes.iv_value, KEYLEN);
+    }
+    return true;
+}
+
+static bool init_section_is_ts(const ByteBuffer_t *data)
+{
+    if (data->len < 2 * TS_PACKET_LENGTH || data->len % TS_PACKET_LENGTH) {
+        return false;
+    }
+    for (int i = 0; i < data->len; i += TS_PACKET_LENGTH) {
+        if (data->data[i] != TS_SYNC_BYTE) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void init_section_state_cleanup(init_section_state_t *state)
+{
+    hls_init_section_free(state->section);
+    free(state->data.data);
+}
+
+static int write_init_section(void **session, const hls_media_segment_t *ms,
+    write_ctx_t *out, init_section_state_t *state, int64_t *download_size)
+{
+    const hls_init_section_t *section = ms->init_section;
+    if (!section) {
+        if (state->section) {
+            MSG_ERROR("Media segment is missing its EXT-X-MAP.\n");
+            return 1;
+        }
+        return 0;
+    }
+    if (state->section && same_init_section(section, state->section) &&
+        state->discontinuity_sequence == ms->discontinuity_sequence) {
+        return 0;
+    }
+
+    hls_media_segment_t map = {0};
+    map.url = section->url;
+    map.offset = section->offset;
+    map.size = section->size;
+    map.encryptiontype = section->encryptiontype;
+    map.enc_aes = section->enc_aes;
+    map.enc_aes.key_url = section->enc_aes.key_url ? strdup(section->enc_aes.key_url) : NULL;
+    if (section->enc_aes.key_url && !map.enc_aes.key_url) {
+        return 1;
+    }
+    ByteBuffer_t data = {0};
+    int ret = vod_download_segment(session, &map, &data, true);
+    free(map.enc_aes.key_url);
+    if (ret) {
+        free(data.data);
+        return ret;
+    }
+    if (data.len <= 0) {
+        MSG_ERROR("Empty initialization section.\n");
+        free(data.data);
+        return 1;
+    }
+
+    bool is_ts = init_section_is_ts(&data);
+    bool write_section = true;
+    if (state->section && !(is_ts && init_section_is_ts(&state->data))) {
+        if (state->discontinuity_sequence != ms->discontinuity_sequence ||
+            data.len != state->data.len || memcmp(data.data, state->data.data, data.len)) {
+            MSG_ERROR("Changing non-TS initialization sections or discontinuities requires remuxing.\n");
+            free(data.data);
+            return 1;
+        }
+        // A new URI or key can still describe the same initialization bytes.
+        write_section = false;
+    } else if (!state->section && state->wrote_media && !is_ts) {
+        MSG_ERROR("Introducing a non-TS initialization section after media requires remuxing.\n");
+        free(data.data);
+        return 1;
+    }
+
+    if (write_section) {
+        size_t written = out->write(data.data, data.len, out->opaque);
+        *download_size += written;
+        if (written != (size_t)data.len) {
+            MSG_ERROR("Could not write initialization section.\n");
+            free(data.data);
+            return 1;
+        }
+    }
+    hls_init_section_free(state->section);
+    free(state->data.data);
+    state->section = hls_init_section_clone(section);
+    state->data = data;
+    state->discontinuity_sequence = ms->discontinuity_sequence;
+    return state->section ? 0 : 1;
+}
+
 int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
 {
     MSG_API("{\"d_t\":\"live\"}\n");
@@ -1482,6 +1697,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     time_t repTime = 0;
     bool download = true;
     int result = 0;
+    init_section_state_t init_state = {0};
     while(download) {
 
         pthread_mutex_lock(&media_playlist_mtx);
@@ -1512,6 +1728,12 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
         pthread_mutex_unlock(&media_playlist_mtx);
         if (ms == NULL) {
             continue;
+        }
+
+        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size)) {
+            media_segment_cleanup(ms);
+            result = 1;
+            break;
         }
 
         MSG_PRINT("Downloading part %d\n", ms->sequence_number);
@@ -1575,6 +1797,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
                 result = 1;
                 download = false;
             }
+            init_state.wrote_media = true;
             free(seg.data);
 
             set_fresh_connect_http_session(session, 0);
@@ -1596,6 +1819,7 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     pthread_cond_signal(&media_playlist_refresh_cond);
     pthread_mutex_unlock(&media_playlist_mtx);
     pthread_join(thread, &ret);
+    init_section_state_cleanup(&init_state);
     pthread_mutex_destroy(&media_playlist_mtx);
 
     pthread_cond_destroy(&media_playlist_refresh_cond);
@@ -1613,17 +1837,29 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     return result;
 }
 
-static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg)
+static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map)
 {
     int retries = 0;
     int ret = 0;
     while (true) {
-        MSG_PRINT("Downloading part %d\n", ms->sequence_number);
+        if (is_map) {
+            MSG_PRINT("Downloading initialization section %s\n", ms->url);
+        } else {
+            MSG_PRINT("Downloading part %d\n", ms->sequence_number);
+        }
 
         memset(seg, 0x00, sizeof(*seg));
         size_t size = 0;
         long http_code = get_data_from_url_with_session(psession, ms->url, (char **)&(seg->data), &size, BINARY, NULL, ms->offset, ms->size);
         seg->len = (int)size;
+        if (is_map && (http_code == 200 || http_code == 206) &&
+            (!size || size > INT_MAX ||
+             (ms->size >= 0 && (size != (size_t)ms->size ||
+              (strstr(ms->url, "://") && http_code != 206))))) {
+            MSG_ERROR("Invalid initialization section response or byte range.\n");
+            ret = 1;
+            break;
+        }
         if (!(http_code == 200 || (http_code == 206 && (ms->size > -1 || hls_args.accept_partial_content)))) {
             if (seg->data) {
                 free(seg->data);
@@ -1722,6 +1958,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     int64_t download_size = 0;
     struct ByteBuffer seg;
     struct ByteBuffer seg_audio;
+    init_section_state_t init_state = {0};
 
     struct hls_media_segment *ms = me->first_media_segment;
     struct hls_media_segment *ms_audio = NULL;
@@ -1734,7 +1971,8 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     }
 
     while(ms) {
-        if (vod_download_segment(&session, ms, &seg)) {
+        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size) ||
+            vod_download_segment(&session, ms, &seg, false)) {
             ret = 1;
             break;
         }
@@ -1742,7 +1980,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
         uint8_t *first_video_packet = find_first_ts_packet(&seg);
         uint8_t *first_audio_packet = NULL;
         if (ms_audio) {
-            if (vod_download_segment(&session, ms_audio, &seg_audio)) {
+            if (vod_download_segment(&session, ms_audio, &seg_audio, false)) {
                 free(seg.data);
                 ret = 1;
                 break;
@@ -1770,6 +2008,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
                 ret = 1;
             }
         }
+        init_state.wrote_media = true;
 
         if (ms_audio) {
             free(seg_audio.data);
@@ -1794,6 +2033,7 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
 
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);
 
+    init_section_state_cleanup(&init_state);
     if (session) {
         clean_http_session(session);
     }
@@ -1828,6 +2068,7 @@ void media_segment_cleanup(struct hls_media_segment *ms)
     {
         free(ms->url);
         free(ms->enc_aes.key_url);
+        hls_init_section_free(ms->init_section);
         free(ms);
     }
 }

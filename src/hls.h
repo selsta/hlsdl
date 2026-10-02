@@ -34,6 +34,14 @@ typedef struct enc_aes128 {
     char *key_url;
 } enc_aes128_t;
 
+typedef struct hls_init_section {
+    char *url;
+    int64_t offset;
+    int64_t size;
+    int encryptiontype;
+    struct enc_aes128 enc_aes;
+} hls_init_section_t;
+
 typedef struct hls_media_segment {
     char *url;
     int64_t offset;
@@ -41,7 +49,9 @@ typedef struct hls_media_segment {
     int sequence_number;
     uint64_t duration_ms;
     int encryptiontype;
+    int discontinuity_sequence;
     struct enc_aes128 enc_aes;
+    hls_init_section_t *init_section;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;
 } hls_media_segment_t;
@@ -107,6 +117,8 @@ void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(hls_media_playlist_t *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
 void media_segment_cleanup(struct hls_media_segment *ms);
+hls_init_section_t *hls_init_section_clone(const hls_init_section_t *section);
+void hls_init_section_free(hls_init_section_t *section);
 void add_media_segment(hls_media_playlist_t *me);
 int fill_key_value(struct enc_aes128 *es);
 
