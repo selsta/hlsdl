@@ -90,6 +90,7 @@ typedef struct hls_playlist_updater_params {
     void *media_playlist_refresh_cond;
     void *media_playlist_empty_cond;
     bool stop;
+    bool failed;
 } hls_playlist_updater_params;
 
 
