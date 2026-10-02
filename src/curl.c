@@ -230,7 +230,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     chunk.reserved = 0;
     chunk.c = c;
 
-    char range_buff[22];
+    char range_buff[42];
     char* range = NULL;
     if (range_size > -1) {
         snprintf(range_buff, sizeof(range_buff), "%"PRId64"-%"PRId64, range_offset, range_offset + range_size - 1);
@@ -293,7 +293,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
 
     if (res != CURLE_OK) {
         MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-        if (http_code == 200) {
+        if (http_code == 200 || http_code == 206) {
             http_code = -res;
         }
     } else {
