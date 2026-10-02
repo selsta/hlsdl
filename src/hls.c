@@ -1179,7 +1179,9 @@ static int sample_aes_handle_pes_data(hls_media_segment_t *s, ByteBuffer_t *out,
 static int decrypt_sample_aes(hls_media_segment_t *s, ByteBuffer_t *buf)
 {
     int ret = 0;
-    fill_key_value(&(s->enc_aes));
+    if (fill_key_value(&(s->enc_aes))) {
+        return 1;
+    }
     if (buf->len > TS_PACKET_LENGTH && buf->data[0] == TS_SYNC_BYTE) {
         pmt_data_t pmt = {0};
         if (find_pmt(buf->data, buf->len, &pmt)) {
