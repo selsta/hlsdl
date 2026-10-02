@@ -1523,7 +1523,13 @@ typedef struct init_section_state {
     bool wrote_media;
 } init_section_state_t;
 
-static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map);
+typedef enum segment_result {
+    SEGMENT_OK,
+    SEGMENT_ERROR,
+    SEGMENT_DOWNLOAD_ERROR
+} segment_result_t;
+
+static segment_result_t vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map);
 
 static bool same_init_section(const hls_init_section_t *a, const hls_init_section_t *b)
 {
@@ -1839,10 +1845,10 @@ int download_live_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me)
     return result;
 }
 
-static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map)
+static segment_result_t vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBuffer_t *seg, bool is_map)
 {
     int retries = 0;
-    int ret = 0;
+    segment_result_t ret = SEGMENT_OK;
     while (true) {
         if (is_map) {
             MSG_PRINT("Downloading initialization section %s\n", ms->url);
@@ -1853,15 +1859,6 @@ static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBu
         memset(seg, 0x00, sizeof(*seg));
         size_t size = 0;
         long http_code = get_data_from_url_with_session(psession, ms->url, (char **)&(seg->data), &size, BINARY, NULL, ms->offset, ms->size);
-        seg->len = (int)size;
-        if (is_map && (http_code == 200 || http_code == 206) &&
-            (!size || size > INT_MAX ||
-             (ms->size >= 0 && (size != (size_t)ms->size ||
-              (strstr(ms->url, "://") && http_code != 206))))) {
-            MSG_ERROR("Invalid initialization section response or byte range.\n");
-            ret = 1;
-            break;
-        }
         if (!(http_code == 200 || (http_code == 206 && (ms->size > -1 || hls_args.accept_partial_content)))) {
             if (seg->data) {
                 free(seg->data);
@@ -1879,18 +1876,34 @@ static int vod_download_segment(void **psession, hls_media_segment_t *ms, ByteBu
                     continue;
                 }
             }
-            ret = 1;
+            ret = SEGMENT_DOWNLOAD_ERROR;
             MSG_API("{\"error_code\":%d, \"error_msg\":\"http\"}\n", (int)http_code);
             break;
         }
+        if (!size || size > INT_MAX) {
+            MSG_ERROR("Invalid segment response size.\n");
+            ret = SEGMENT_ERROR;
+            break;
+        }
+        if (is_map && ms->size >= 0 && (size != (size_t)ms->size ||
+            (strstr(ms->url, "://") && http_code != 206))) {
+            MSG_ERROR("Invalid initialization section response or byte range.\n");
+            ret = SEGMENT_ERROR;
+            break;
+        }
+        seg->len = (int)size;
         break;
     }
 
-    if (ret == 0) {
+    if (ret == SEGMENT_OK) {
         if (ms->encryptiontype == ENC_AES128) {
-            ret = decrypt_aes128(ms, seg);
+            ret = decrypt_aes128(ms, seg) ? SEGMENT_ERROR : SEGMENT_OK;
         } else if (ms->encryptiontype == ENC_AES_SAMPLE) {
-            ret = decrypt_sample_aes(ms, seg);
+            ret = decrypt_sample_aes(ms, seg) ? SEGMENT_ERROR : SEGMENT_OK;
+        }
+        if (ret == SEGMENT_OK && seg->len <= 0) {
+            MSG_ERROR("Empty decrypted segment.\n");
+            ret = SEGMENT_ERROR;
         }
     }
 
@@ -1958,8 +1971,6 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
 
     uint64_t downloaded_duration_ms = 0;
     int64_t download_size = 0;
-    struct ByteBuffer seg;
-    struct ByteBuffer seg_audio;
     init_section_state_t init_state = {0};
 
     struct hls_media_segment *ms = me->first_media_segment;
@@ -1973,20 +1984,36 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
     }
 
     while(ms) {
-        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size) ||
-            vod_download_segment(&session, ms, &seg, false)) {
+        struct ByteBuffer seg = {0};
+        struct ByteBuffer seg_audio = {0};
+        segment_result_t segment_result = vod_download_segment(&session, ms, &seg, false);
+        if (segment_result == SEGMENT_OK && ms_audio) {
+            segment_result = vod_download_segment(&session, ms_audio, &seg_audio, false);
+        }
+        if (segment_result != SEGMENT_OK) {
+            free(seg.data);
+            free(seg_audio.data);
+            if (hls_args.ignore_download_errors && segment_result == SEGMENT_DOWNLOAD_ERROR) {
+                MSG_WARNING("Skipping VOD segment %d after failed download. Output will be incomplete.\n", ms->sequence_number);
+                ms = ms->next;
+                if (ms_audio) {
+                    ms_audio = ms_audio->next;
+                }
+                continue;
+            }
             ret = 1;
             break;
         }
 
+        if (write_init_section(&session, ms, out_ctx, &init_state, &download_size)) {
+            free(seg.data);
+            free(seg_audio.data);
+            ret = 1;
+            break;
+        }
         uint8_t *first_video_packet = find_first_ts_packet(&seg);
         uint8_t *first_audio_packet = NULL;
         if (ms_audio) {
-            if (vod_download_segment(&session, ms_audio, &seg_audio, false)) {
-                free(seg.data);
-                ret = 1;
-                break;
-            }
             first_audio_packet = find_first_ts_packet(&seg_audio);
         }
 
@@ -1995,13 +2022,18 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
             size_t video_len = seg.len - (first_video_packet - seg.data);
             size_t audio_len = seg_audio.len - (first_audio_packet - seg_audio.data);
 
-            download_size += merge_packets(
+            size_t written = merge_packets(
                 &merge_context,
                 first_video_packet,
                 video_len,
                 first_audio_packet,
                 audio_len
             );
+            download_size += written;
+            if (!written) {
+                MSG_ERROR("Could not merge media segments.\n");
+                ret = 1;
+            }
         } else {
             size_t written = out_ctx->write(seg.data, seg.len, out_ctx->opaque);
             download_size += written;
@@ -2010,7 +2042,9 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
                 ret = 1;
             }
         }
-        init_state.wrote_media = true;
+        if (!ret) {
+            init_state.wrote_media = true;
+        }
 
         if (ms_audio) {
             free(seg_audio.data);
@@ -2031,6 +2065,11 @@ int download_hls(write_ctx_t *out_ctx, hls_media_playlist_t *me, hls_media_playl
         }
 
         ms = ms->next;
+    }
+
+    if (!ret && !init_state.wrote_media) {
+        MSG_ERROR("No media segments were written.\n");
+        ret = 1;
     }
 
     MSG_API("{\"t_d\":%u,\"d_d\":%u,\"d_s\":%"PRId64"}\n", (uint32_t)(me->total_duration_ms / 1000), (uint32_t)(downloaded_duration_ms / 1000), download_size);

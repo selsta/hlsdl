@@ -75,6 +75,8 @@ Output keeps the original container format. Use `-o video.mp4` for fragmented MP
 Fragmented MP4 discontinuities and changes to initialization data are not supported.
 Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
 
+Use `-I` to skip failed VOD segment downloads after retries. The output will be incomplete.
+
 ---------------------------
 ```
 -b ... Automatically choose the best quality.
@@ -120,6 +122,8 @@ Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
 -r ... Set max retries at open.
 
 -w ... Set max download segment retries.
+
+-I ... Skip failed VOD segment downloads after retries.
 
 -a ... Set additional url to the audio media playlist.
 

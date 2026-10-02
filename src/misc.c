@@ -44,6 +44,7 @@ static void print_help(const char *filename)
            "-e ... Set refresh delay in seconds.\n"
            "-r ... Set max retries at open.\n"
            "-w ... Set max download segment retries.\n"
+           "-I ... Skip failed VOD segment downloads after retries.\n"
            "-a ... Set additional url to the audio media playlist.\n"
            "-c ... Treat HTTP code 206 as 200 even if request was made without range header.\n"
            "-C ... the file name of file holding cookie data in the old Netscape / Mozilla cookie data format.\n", filename);
@@ -55,7 +56,7 @@ int parse_argv(int argc, char * const argv[])
     int ret = 0;
     int c = 0;
     int custom_header_idx = 0;
-    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:e:p:k:n:a:C:")) != -1)
+    while ( (c = getopt(argc, argv, "bH:W:A:vqbfFK:ctdo:u:h:s:i:r:w:Ie:p:k:n:a:C:")) != -1)
     {
         switch (c)
         {
@@ -110,6 +111,9 @@ int parse_argv(int argc, char * const argv[])
             break;
         case 'w':
             hls_args.segment_download_retries = atoi(optarg);
+            break;
+        case 'I':
+            hls_args.ignore_download_errors = true;
             break;
         case 'o':
             if(strlen(optarg) < MAX_FILENAME_LEN)

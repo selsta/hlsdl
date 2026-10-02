@@ -41,6 +41,7 @@ struct hls_args {
     int live_duration_sec;
     int refresh_delay_sec;
     int segment_download_retries;
+    bool ignore_download_errors;
     int open_max_retries;
     char *filename;
     char *url;
