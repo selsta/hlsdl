@@ -1512,7 +1512,7 @@ static int vod_download_segment(void **psession, hls_media_playlist_t *me, struc
                 free(seg->data);
                 seg->data = NULL;
             }
-            if (http_code != 403 && http_code != 401 && http_code != 410 && retries <= hls_args.segment_download_retries) {
+            if (http_code != 403 && http_code != 401 && http_code != 410 && retries < hls_args.segment_download_retries) {
                 clean_http_session(*psession);
                 sleep(1);
                 *psession = init_hls_session();
