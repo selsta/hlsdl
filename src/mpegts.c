@@ -11,6 +11,9 @@
 #define MSG_ERROR printf
 #define MSG_WARNING printf
 #define MSG_DBG printf
+#endif
+
+#ifdef _WIN32
 void *memmem(const void *haystack, size_t n, const void *needle, size_t m);
 #endif
 

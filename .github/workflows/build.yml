@@ -4,31 +4,68 @@ on: [push, pull_request]
 
 jobs:
   build-macos:
-
-    runs-on: macOS-latest
-    
+    runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v1
-    - name: make
-      run: make
+    - uses: actions/checkout@v7
+    - name: configure
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    - name: build
+      run: cmake --build build --parallel
     - name: download testfile
-      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+      run: ./build/hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
-      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c
 
   build-ubuntu:
-
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v1
-    - name: update apt
-      run: sudo apt update
-    - name: install libcurl libcrypto
-      run: sudo apt -y install libcurl4-openssl-dev libssl-dev
-    - name: make
-      run: make
+    - uses: actions/checkout@v7
+    - name: install dependencies
+      run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libssl-dev
+    - name: configure
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    - name: build
+      run: cmake --build build --parallel
     - name: download testfile
-      run: ./hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+      run: ./build/hlsdl -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
     - name: verify testfile
-      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | shasum -a256 -c 
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | sha256sum -c
+
+  build-mingw:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - uses: actions/checkout@v7
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >-
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-cmake
+          mingw-w64-ucrt-x86_64-ninja
+          mingw-w64-ucrt-x86_64-curl
+          mingw-w64-ucrt-x86_64-openssl
+    - name: configure
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    - name: build
+      run: cmake --build build --parallel
+    - name: download testfile
+      run: ./build/hlsdl.exe -b -o test.ts "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8"
+    - name: verify testfile
+      run: echo "6bf11a9a4be02443d4790e43e6569a614128bad453c5cb327ec74031f6ea6382  test.ts" | sha256sum -c
+
+  build-msvc:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: install dependencies
+      run: vcpkg install curl:x64-windows openssl:x64-windows pthreads:x64-windows
+    - name: configure
+      run: cmake -S . -B build -A x64 "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows
+    - name: build
+      run: cmake --build build --config Release --parallel
+    - name: check executable
+      run: ./build/Release/hlsdl.exe

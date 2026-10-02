@@ -1,15 +1,17 @@
-FROM alpine:latest as builder
+FROM alpine:latest AS builder
 
 WORKDIR /hlsdl-repo
 
 RUN --mount=type=cache,target=/var/cache/apk \
-    apk add gcc make curl-dev libc-dev
+    apk add cmake ninja gcc libc-dev curl-dev openssl-dev
 
-COPY makefile hlsdl.1 LICENSE ./
+COPY CMakeLists.txt hlsdl.1 LICENSE ./
 
 COPY src src
 
-RUN make && make install && make clean
+RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build --parallel \
+    && cmake --install build
 
 
 FROM alpine:latest

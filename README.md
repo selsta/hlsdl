@@ -6,18 +6,49 @@ This program downloads .m3u8 playlists containing MPEG-2 Transport Streams or fr
 Requirements
 ------------
 
-This program requires libcurl and libcrypto libraries.
+This program requires libcurl, OpenSSL's libcrypto, and POSIX threads.
 
 Build
 -----
 
 ![hlsdl build](https://github.com/selsta/hlsdl/workflows/hlsdl%20build/badge.svg)
 
-Linux:
-`make && make install && make clean`
+Build with CMake 3.21 or newer and a C11 compiler:
 
-Windows:
-https://github.com/selsta/hlsdl/blob/master/msvc/BUID_WINDOWS.txt
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --install build
+```
+
+The executable is `build/hlsdl`. Installation is optional. Use
+`-DCMAKE_INSTALL_PREFIX=/your/prefix` when configuring to change its destination.
+
+On Debian/Ubuntu, install `build-essential cmake libcurl4-openssl-dev libssl-dev`.
+On macOS, install `cmake openssl` with Homebrew. If OpenSSL is not found, add
+`-DOPENSSL_ROOT_DIR="$(brew --prefix openssl)"` to the configure command.
+
+Windows with [MSYS2](https://www.msys2.org/): run these commands in the UCRT64 shell,
+then build with `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release` and
+`cmake --build build`:
+
+```sh
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake \
+    mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-curl mingw-w64-ucrt-x86_64-openssl
+```
+
+Run `build/hlsdl.exe` from the UCRT64 shell so its dependency DLLs can be found.
+
+For MSVC, install the dependencies with [vcpkg](https://github.com/microsoft/vcpkg)
+and run these commands in PowerShell, with `VCPKG_ROOT` pointing to vcpkg:
+
+```powershell
+& "$env:VCPKG_ROOT/vcpkg.exe" install curl openssl pthreads --triplet x64-windows
+cmake -S . -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+cmake --build build --config Release
+```
+
+The executable is `build/Release/hlsdl.exe`.
 
 Docker: `docker build -t hlsdl:latest .`
 
@@ -30,7 +61,7 @@ Usage and Options
 docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 ```
 
-Output keeps the original container format; use `-o video.mp4` for fragmented MP4.
+Output keeps the original container format. Use `-o video.mp4` for fragmented MP4.
 Fragmented MP4 discontinuities and changes to initialization data are not supported.
 Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
 
