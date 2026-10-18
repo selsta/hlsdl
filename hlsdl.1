@@ -43,7 +43,9 @@ Choose largest width lower or equal than this.
 Choose largest height lower or equal than this.
 .TP
 .BI -A " language
-Select audio language.
+Select audio language (case-insensitive, "de" also matches "de-DE"). When no
+rendition matches, or without -A but with -b, -W or -H, the DEFAULT rendition
+is taken, else the first one. Otherwise hlsdl asks.
 .TP
 .B
 -v 
@@ -76,8 +78,15 @@ Replace every occurence of the string \fIold\fP with \fInew\fP in the
 AES key uri.
 .TP
 .B
--f 
+-f
 Overwrite the output file without asking.
+.TP
+.B
+-R
+Resume an interrupted VOD download. The progress is kept in a sidecar file
+<output>.hlsdl.resume next to the output and removed when the download is
+complete. A playlist that does not match the sidecar starts afresh. Cannot be
+used with -I or -m.
 .TP
 .B
 -F 
@@ -90,7 +99,8 @@ The key is a string of 32 hexadecimal characters, with no hyphen in between.
 .B
 -q 
 Print less to the console. This option decreases the verbosity level each time
-is given. It is the opposite of \fI-v\fP.
+is given. It is the opposite of \fI-v\fP. With -q the status lines, errors
+and warnings are still printed, -qq prints nothing.
 .TP
 .B
 -d 
@@ -101,7 +111,8 @@ Print the openssl decryption command.
 Print the links to the .ts files.
 .TP
 .BI -s " seconds
-Set live start offset in seconds.
+Set live start offset in seconds. A live download starts at least three
+target durations before the end of the playlist.
 .TP
 .BI -i " seconds
 Set live stream download duration in seconds.
@@ -119,9 +130,12 @@ Set max download segment retries.
 -I
 Skip failed VOD segment downloads after retries. The output will be incomplete.
 Key, decryption, initialization section, and output errors remain fatal.
+Cannot be used with -R.
 .TP
 .BI -a " url
-Set additional url to the audio media playlist.
+Set additional url to the audio media playlist (VOD and live). MPEG-TS and
+packed audio are merged into the TS output, fragmented MP4 audio becomes a
+second track of the fragmented MP4 output (both playlists need EXT-X-MAP).
 .TP
 .B
 -c 

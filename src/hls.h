@@ -13,10 +13,17 @@ extern "C" {
 #define MASTER_PLAYLIST 0
 #define MEDIA_PLAYLIST 1
 
+/* an EXT-X-KEY METHOD hlsdl does not know (e.g. AES-256-GCM, HLS 2nd edition):
+ * such segments must not be "decrypted" nor written as they are */
+#define ENC_UNSUPPORTED 0x04
 #define ENC_AES_SAMPLE_CTR 0x03
 #define ENC_AES_SAMPLE 0x02
 #define ENC_AES128 0x01
 #define ENC_NONE 0x00
+
+#define MEDIA_TYPE_UNKNOWN 0
+#define MEDIA_TYPE_TS      1
+#define MEDIA_TYPE_FMP4    2  /* fragmented MP4 / CMAF */
 
 #define KEYLEN 16
 
@@ -34,24 +41,18 @@ typedef struct enc_aes128 {
     char *key_url;
 } enc_aes128_t;
 
-typedef struct hls_init_section {
-    char *url;
-    int64_t offset;
-    int64_t size;
-    int encryptiontype;
-    struct enc_aes128 enc_aes;
-} hls_init_section_t;
-
 typedef struct hls_media_segment {
     char *url;
     int64_t offset;
     int64_t size;
     int sequence_number;
+    bool is_map;
+    bool discontinuity;   /* an EXT-X-DISCONTINUITY precedes this segment */
+    bool is_gap;          /* EXT-X-GAP: the segment is missing - never fetched */
+    int restart_gen;      /* stream restarts (media sequence went back) of its playlist when it was queued */
+    int encryptiontype;   /* ENC_* of the EXT-X-KEY in force for this segment */
     uint64_t duration_ms;
-    int encryptiontype;
-    int discontinuity_sequence;
     struct enc_aes128 enc_aes;
-    hls_init_section_t *init_section;
     struct hls_media_segment *next;
     struct hls_media_segment *prev;
 } hls_media_segment_t;
@@ -67,10 +68,14 @@ typedef struct hls_media_playlist {
     uint64_t target_duration_ms;
     uint64_t total_duration_ms;
     bool is_endlist;
-    bool encryption;
-    int encryptiontype;
+    bool encryption;               /* any EXT-X-KEY other than METHOD=NONE */
+    int encryptiontype;            /* the last method other than NONE */
+    int current_encryptiontype;    /* method while parsing, NONE included */
+    int media_type;                /* MEDIA_TYPE_*, detected from the first segment */
+    int discontinuity_sequence;    /* EXT-X-DISCONTINUITY-SEQUENCE */
     int first_media_sequence;
     int last_media_sequence;
+    int restart_gen;               /* live: stream restarts followed so far */
     struct hls_media_segment *first_media_segment;
     struct hls_media_segment *last_media_segment;
     struct enc_aes128 enc_aes;
@@ -79,7 +84,7 @@ typedef struct hls_media_playlist {
 } hls_media_playlist_t;
 
 typedef struct hls_audio {
-    char *url;
+    char *url;            /* NULL: the rendition is muxed into the variant itself */
     char *grp_id;
     char *lang;
     char *name;
@@ -100,27 +105,26 @@ typedef struct hls_playlist_updater_params {
     void *media_playlist_mtx;
     void *media_playlist_refresh_cond;
     void *media_playlist_empty_cond;
-    bool stop;
-    bool failed;
+    bool stop;   /* set under media_playlist_mtx: the thread ends at its next wake-up */
+    bool failed; /* set under media_playlist_mtx: a refreshed playlist could not be parsed */
 } hls_playlist_updater_params;
 
 
 int get_playlist_type(char *source);
 int handle_hls_master_playlist(struct hls_master_playlist *ma);
 int handle_hls_media_playlist(hls_media_playlist_t *me);
-int download_live_hls(write_ctx_t *ctx, hls_media_playlist_t *me);
+int download_live_hls(write_ctx_t *ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
 bool consecutive_sync_byte(uint8_t *buf, size_t len, uint8_t n);
 uint8_t * find_first_ts_packet(ByteBuffer_t *buf);
-int download_hls(write_ctx_t *ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio);
+int download_hls(write_ctx_t *ctx, hls_media_playlist_t *me, hls_media_playlist_t *me_audio, hls_resume_state_t *resume);
 int print_enc_keys(hls_media_playlist_t *me);
 void print_hls_master_playlist(struct hls_master_playlist *ma);
 void media_playlist_cleanup(hls_media_playlist_t *me);
 void master_playlist_cleanup(struct hls_master_playlist *ma);
 void media_segment_cleanup(struct hls_media_segment *ms);
-hls_init_section_t *hls_init_section_clone(const hls_init_section_t *section);
-void hls_init_section_free(hls_init_section_t *section);
 void add_media_segment(hls_media_playlist_t *me);
 int fill_key_value(struct enc_aes128 *es);
+void fill_key_value_cleanup(void);
 
 long get_hls_data_from_url(char *url, char **out, size_t *size, int type, char **new_url);
 

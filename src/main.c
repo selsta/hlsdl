@@ -1,5 +1,7 @@
 #ifndef _MSC_VER
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #else
 #include <Windows.h>
 #define sleep Sleep
@@ -27,14 +29,93 @@ char* str_ecryption_type[] ={
     "AES-128",
     "SAMPLE-AES",
     "SAMPLE-AES-CTR",
+    "UNSUPPORTED",
 };
-
 
 typedef struct output_file {
     FILE *file;
     char filename[MAX_FILENAME_LEN + 22];
     bool failed;
 } output_file_t;
+
+/* LANGUAGE of a rendition against -A, case-insensitive (BCP 47 tags):
+ * "de" also takes "de-DE" / "DE" */
+static bool lang_matches(const char *lang, const char *wanted)
+{
+    if (!lang || !wanted) {
+        return false;
+    }
+    while (*lang && *wanted) {
+        char a = *lang++, b = *wanted++;
+        if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+        if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+        if (a != b) {
+            return false;
+        }
+    }
+    return *wanted == '\0' && (*lang == '\0' || *lang == '-');
+}
+
+/* The AUDIO rendition of group grp_id to use. Without a terminal to ask
+ * (-b, -A, -W or -H given) it is never asked for: the -A language, else the
+ * DEFAULT=YES one, else the first one. Asking used to block on stdin when the
+ * group had no DEFAULT rendition. A rendition with url == NULL is the audio
+ * inside the variant itself. NULL when the group is unknown. */
+static hls_audio_t *select_audio_rendition(hls_audio_t *list, const char *grp_id)
+{
+    hls_audio_t *audio;
+    hls_audio_t *first = NULL;
+    hls_audio_t *def = NULL;
+    hls_audio_t *by_lang = NULL;
+    int count = 0;
+
+    for (audio = list; audio; audio = audio->next) {
+        if (strcmp(audio->grp_id, grp_id)) {
+            continue;
+        }
+        count++;
+        if (!first) {
+            first = audio;
+        }
+        if (!def && audio->is_default) {
+            def = audio;
+        }
+        if (!by_lang && hls_args.audiolang && lang_matches(audio->lang, hls_args.audiolang)) {
+            by_lang = audio;
+        }
+    }
+    if (count <= 1) {
+        return first;
+    }
+    if (by_lang) {
+        return by_lang;
+    }
+    if (hls_args.use_best || hls_args.audiolang || hls_args.maxwidth > -1 || hls_args.maxheight > -1) {
+        return def ? def : first;
+    }
+
+    int i = 0;
+    int audio_choice = -1;
+    for (audio = list; audio; audio = audio->next) {
+        if (!strcmp(audio->grp_id, grp_id)) {
+            MSG_PRINT("%d: Name: %s, Language: %s%s\n", i, audio->name, audio->lang ? audio->lang : "unknown",
+                      audio->url ? "" : " (in the video stream)");
+            i += 1;
+        }
+    }
+    MSG_PRINT("Which Language should be downloaded? ");
+    if (scanf("%d", &audio_choice) != 1 || audio_choice < 0 || audio_choice >= i) {
+        MSG_ERROR("Wrong input!\n");
+        exit(1);
+    }
+    i = 0;
+    for (audio = list; audio; audio = audio->next) {
+        if (!strcmp(audio->grp_id, grp_id) && i++ == audio_choice) {
+            return audio;
+        }
+    }
+    return NULL;
+}
 
 static bool is_file_exists(const char *filename)
 {
@@ -47,6 +128,89 @@ static bool is_file_exists(const char *filename)
     ret = stat(filename, &info);
     return 0 == ret;
 #endif
+}
+
+/* FNV-1a over what identifies the playlist being downloaded: for the video and
+ * then the audio playlist the selected variant's bandwidth / resolution /
+ * codecs and, per segment, the URL path, byte range and duration. Two quality
+ * variants of the same VOD almost always have the same segment count, so this
+ * is what actually tells a resume run that the playlist it was handed is a
+ * different one. The variant and duration terms keep that true when the URLs
+ * alone cannot tell (they are stripped of scheme, host and query, see below). */
+static uint64_t fnv1a(uint64_t h, const void *data, size_t len)
+{
+    const unsigned char *p = data;
+    while (len--) {
+        h ^= *p++;
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
+
+static uint64_t fnv1a_str(uint64_t h, const char *s)
+{
+    if (s) {
+        h = fnv1a(h, s, strlen(s));
+    }
+    return fnv1a(h, "\xff", 1);   /* keeps ("ab","c") apart from ("a","bc") */
+}
+
+/* The part of a segment URL that identifies the media: its path. Scheme, host
+ * and everything from '?' / '#' on are left out - CDNs routinely put a
+ * per-request signature or session token in the query string (and may hand out
+ * a different edge hostname each time), so hashing them would make every
+ * resume of the very same stream look like a different playlist. Quality
+ * variants still differ in their path (and, if not, in the variant terms of the
+ * fingerprint). A relative segment URL is stored joined to its playlist's URL,
+ * so the playlist's own path counts too. A token that lives in the path itself
+ * only costs a resume (starting fresh), never a wrong splice. */
+static void url_identity(const char *url, const char **start, size_t *len)
+{
+    const char *p = url;
+    const char *q = url;
+
+    if ((*q >= 'a' && *q <= 'z') || (*q >= 'A' && *q <= 'Z')) {
+        while ((*q >= 'a' && *q <= 'z') || (*q >= 'A' && *q <= 'Z')
+               || (*q >= '0' && *q <= '9') || *q == '+' || *q == '-' || *q == '.') {
+            q++;
+        }
+        if (0 == strncmp(q, "://", 3)) {
+            p = strchr(q + 3, '/');
+            if (!p) {
+                p = url + strlen(url);
+            }
+        }
+    }
+    *start = p;
+    *len = strcspn(p, "?#");
+}
+
+static uint64_t playlist_fingerprint(const hls_media_playlist_t *me, const hls_media_playlist_t *audio)
+{
+    uint64_t h = 14695981039346656037ULL;   /* FNV-1a 64-bit offset basis */
+    for (int pass = 0; pass < 2; pass++) {
+        const hls_media_playlist_t *pl = pass ? audio : me;
+        if (!pl) {
+            continue;
+        }
+        h = fnv1a(h, &pl->bitrate, sizeof(pl->bitrate));
+        h = fnv1a_str(h, pl->resolution);
+        h = fnv1a_str(h, pl->codecs);
+        for (const struct hls_media_segment *s = pl->first_media_segment; s; s = s->next) {
+            if (s->url) {
+                const char *id = NULL;
+                size_t idlen = 0;
+                url_identity(s->url, &id, &idlen);
+                h = fnv1a(h, id, idlen);
+            }
+            h = fnv1a(h, &s->offset, sizeof(s->offset));
+            h = fnv1a(h, &s->size, sizeof(s->size));
+            h = fnv1a(h, &s->duration_ms, sizeof(s->duration_ms));
+            h = fnv1a(h, &s->is_map, sizeof(s->is_map));
+        }
+        h ^= 0x9e3779b97f4a7c15ULL;   /* separate the video and audio runs */
+    }
+    return h;
 }
 
 static FILE* get_output_file(const char *filename)
@@ -94,6 +258,32 @@ static FILE* get_output_file(const char *filename)
     if (pFile == NULL)
     {
         MSG_ERROR("Error can not open output file\n");
+        return NULL;
+    }
+    return pFile;
+}
+
+/* -R: the output of the interrupted run, without truncation or overwrite
+ * prompt, positioned at the resume offset (a partly written tail is cut
+ * off). NULL when that does not work - the caller then starts afresh. */
+static FILE *reopen_output_file(const char *filename, int64_t offset)
+{
+    FILE *pFile = fopen(filename, "r+b");
+    if (!pFile) {
+        MSG_WARNING("resume: cannot reopen %s - starting fresh\n", filename);
+        return NULL;
+    }
+    fflush(pFile);
+#ifndef _MSC_VER
+    int trunc_err = ftruncate(fileno(pFile), (off_t)offset);
+#else
+    int trunc_err = _chsize_s(_fileno(pFile), (long long)offset);
+#endif
+    /* EOF is the resume offset after the truncate; fseek(SEEK_END) needs no
+     * 64-bit absolute offset argument */
+    if (0 != trunc_err || 0 != fseek(pFile, 0, SEEK_END)) {
+        MSG_WARNING("resume: cannot position the output - starting fresh\n");
+        fclose(pFile);
         return NULL;
     }
     return pFile;
@@ -166,6 +356,20 @@ static int finish_output_segment(bool success, void *opaque)
     return out->failed ? 1 : 0;
 }
 
+/* -R: the bytes really in the output file, after a flush */
+static int64_t output_position(void *opaque)
+{
+    output_file_t *out = opaque;
+    if (!out->file || fflush(out->file)) {
+        return -1;
+    }
+#ifdef _MSC_VER
+    return (int64_t)_ftelli64(out->file);
+#else
+    return (int64_t)ftello(out->file);
+#endif
+}
+
 static bool get_data_with_retry(char *url, char **hlsfile_source, char **finall_url, int tries)
 {
     size_t size = 0;
@@ -214,6 +418,18 @@ int main(int argc, char *argv[])
     if (hls_args.separate_segments && hls_args.filename &&
         strcmp(hls_args.filename, "-") == 0) {
         MSG_ERROR("Separate segments cannot be written to stdout.\n");
+        return 1;
+    }
+
+    /* The resume sidecar counts written segments and bytes; after a skipped
+     * segment a later -R run could not tell the gap from the finished part. */
+    if (hls_args.resume && hls_args.ignore_download_errors) {
+        MSG_ERROR("-R and -I cannot be combined.\n");
+        return 1;
+    }
+    /* ... and it describes one output file */
+    if (hls_args.resume && hls_args.separate_segments) {
+        MSG_ERROR("-R and -m cannot be combined.\n");
         return 1;
     }
 
@@ -266,6 +482,7 @@ int main(int argc, char *argv[])
             int height, maxheight = 0;
             hls_media_playlist_t *me;
             for (me = master_playlist.media_playlist; me; me = me->next) {
+                /* a variant without RESOLUTION must not end the search */
                 if (sscanf(me->resolution, "%dx%d", &width, &height) < 2)
                     continue;
                 if (width > hls_args.maxwidth && hls_args.maxwidth != -1)
@@ -319,87 +536,12 @@ int main(int argc, char *argv[])
         }
 
         if (selected->audio_grp) {
-            // check if have valid group
-            hls_audio_t *selected_audio = NULL;
-            hls_audio_t *audio = master_playlist.audio;
-            bool has_audio_playlist = false;
-
-            while (audio) {
-                if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                    if (has_audio_playlist) {
-                        selected_audio = NULL; // more then one audio playlist, so selection is needed
-                        break;
-                    } else {
-                        has_audio_playlist = true;
-                        selected_audio = audio;
-                    }
-                }
-                audio = audio->next;
-            }
-
-            if (has_audio_playlist) {
-                // print hls master playlist
-                int audio_choice = -1;
-                int i = 1;
-
-                if (!selected_audio) {
-                    if (hls_args.use_best || hls_args.audiolang) {
-                        i = 0;
-                        audio = master_playlist.audio;
-                        while (audio) {
-                            if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                                if (hls_args.use_best && audio->is_default) {
-                                    audio_choice = i;
-                                    break;
-                                }
-                                if (hls_args.audiolang && audio->lang && 0 == strcmp(audio->lang, hls_args.audiolang)) {
-                                    audio_choice = i;
-                                    break;
-                                }
-                            }
-                            i += 1;
-                            audio = audio->next;
-                        }
-                    }
-
-                    if (audio_choice < 0) {
-                        audio = master_playlist.audio;
-                        i = 0;
-                        while (audio) {
-                            if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                                MSG_PRINT("%d: Name: %s, Language: %s\n", i, audio->name, audio->lang ? audio->lang : "unknown");
-                            }
-                            i += 1;
-                            audio = audio->next;
-                        }
-
-                        MSG_PRINT("Which Language should be downloaded? ");
-                        if (scanf("%d", &audio_choice) != 1 || audio_choice < 0 || audio_choice >= i) {
-                            MSG_ERROR("Wrong input!\n");
-                            exit(1);
-                        }
-                    }
-
-                    i = 0;
-                    audio = master_playlist.audio;
-                    while (audio) {
-                        if (0 == strcmp(audio->grp_id, selected->audio_grp)) {
-                            if (i == audio_choice) {
-                                selected_audio = audio;
-                                break;
-                            }
-                        }
-                        i += 1;
-                        audio = audio->next;
-                    }
-
-                    if (!selected_audio) {
-                        MSG_ERROR("Wrong selection!\n");
-                        exit(1);
-                    }
-                }
-
+            hls_audio_t *selected_audio = select_audio_rendition(master_playlist.audio, selected->audio_grp);
+            if (selected_audio && selected_audio->url) {
+                MSG_VERBOSE("Audio rendition \"%s\" (%s).\n", selected_audio->name, selected_audio->lang ? selected_audio->lang : "unknown");
                 audio_media_playlist.orig_url = strdup(selected_audio->url);
+            } else if (selected_audio) {
+                MSG_VERBOSE("Audio rendition \"%s\" is part of the variant - no separate audio playlist.\n", selected_audio->name);
             }
         }
 
@@ -447,18 +589,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (audio_media_playlist.orig_url) {
-        hls_media_playlist_t *playlists[] = {&media_playlist, &audio_media_playlist};
-        for (size_t i = 0; i < sizeof(playlists) / sizeof(playlists[0]); ++i) {
-            for (hls_media_segment_t *ms = playlists[i]->first_media_segment; ms; ms = ms->next) {
-                if (ms->init_section) {
-                    MSG_ERROR("EXT-X-MAP with separate audio requires remuxing and is not supported.\n");
-                    return 1;
-                }
-            }
-        }
-    }
-
     MSG_PRINT("HLS Stream is %s encrypted.\n",
                   str_ecryption_type[media_playlist.encryptiontype]);
 
@@ -466,15 +596,16 @@ int main(int argc, char *argv[])
 
     if (hls_args.dump_ts_urls) {
         struct hls_media_segment *ms = media_playlist.first_media_segment;
-        const hls_init_section_t *last_init = NULL;
+        const struct hls_media_segment *last_init = NULL;
         while(ms) {
-            if (ms->init_section && (!last_init ||
-                strcmp(ms->init_section->url, last_init->url) ||
-                ms->init_section->offset != last_init->offset || ms->init_section->size != last_init->size)) {
-                MSG_PRINT("%s\n", ms->init_section->url);
-                last_init = ms->init_section;
+            /* a repeated EXT-X-MAP of the same init is listed once */
+            if (!ms->is_map || !last_init || strcmp(ms->url, last_init->url) ||
+                ms->offset != last_init->offset || ms->size != last_init->size) {
+                MSG_PRINT("%s\n", ms->url);
             }
-            MSG_PRINT("%s\n", ms->url);
+            if (ms->is_map) {
+                last_init = ms;
+            }
             ms = ms->next;
         }
     } else if (hls_args.dump_dec_cmd) {
@@ -483,8 +614,48 @@ int main(int argc, char *argv[])
         }
     } else {
         int ret = -1;
+        hls_resume_state_t *resume = NULL;
+        bool resuming = false;
+
+        if (hls_args.resume && media_playlist.is_endlist
+            && hls_args.filename && 0 != strncmp(hls_args.filename, "-", 2)) {
+            int total = 0, has_map = 0;
+            for (struct hls_media_segment *s = media_playlist.first_media_segment; s; s = s->next) {
+                if (s->is_map) {
+                    has_map = 1;
+                } else {
+                    total++;
+                }
+            }
+            uint64_t fp = playlist_fingerprint(&media_playlist,
+                              audio_media_playlist.first_media_segment ? &audio_media_playlist : NULL);
+            resume = resume_load(hls_args.filename, total, has_map, fp);
+            resuming = (resume && resume->done > 0);
+
+            if (resuming) {
+                /* The output file must be at least as large as the recorded
+                 * byte count, otherwise a truncate would zero-extend it. */
+                struct stat st;
+                if (0 != stat(hls_args.filename, &st) || (int64_t)st.st_size < resume->bytes) {
+                    MSG_WARNING("resume: %s is missing or smaller than expected - starting fresh\n", hls_args.filename);
+                    resume->done = 0;
+                    resume->bytes = 0;
+                    resuming = false;
+                }
+            }
+        }
+
         output_file_t output = {0};
-        if (!hls_args.separate_segments) {
+        if (resuming) {
+            output.file = reopen_output_file(hls_args.filename, resume->bytes);
+            if (!output.file) {
+                /* the partial file stays; get_output_file() overwrites it
+                 * under -f, or asks, rather than deleting it here */
+                resume->done = 0;
+                resume->bytes = 0;
+            }
+        }
+        if (!output.file && !hls_args.separate_segments) {
             output.file = get_output_file(hls_args.filename ? hls_args.filename : "000_hls_output.ts");
         }
         if (output.file || hls_args.separate_segments) {
@@ -493,12 +664,16 @@ int main(int argc, char *argv[])
                 .opaque = &output,
                 .begin_segment = hls_args.separate_segments ? begin_output_segment : NULL,
                 .end_segment = finish_output_segment,
+                .position = output_position,
             };
             if (media_playlist.is_endlist) {
-                ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist);
+                ret = download_hls(&out_ctx, &media_playlist, &audio_media_playlist, resume);
             } else {
-                ret = download_live_hls(&out_ctx, &media_playlist);
+                ret = download_live_hls(&out_ctx, &media_playlist,
+                          audio_media_playlist.first_media_segment ? &audio_media_playlist : NULL);
             }
+            /* the last buffered bytes are written here - a full disk shows up
+             * now, not in the segment writes */
             if (output.file && fclose(output.file)) {
                 MSG_ERROR("Could not finish writing output file.\n");
                 ret = 1;
@@ -507,6 +682,8 @@ int main(int argc, char *argv[])
                 ret = 1;
             }
         }
+        free(resume);
+        fill_key_value_cleanup();
         return ret ? 1 : 0;
     }
 

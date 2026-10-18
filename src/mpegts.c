@@ -336,6 +336,11 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
     const uint8_t *bufp = data;
     ts_packet_t packed;
 
+    /* the component list describes this PMT only - a parse into a pmt_data_t
+     * that held an earlier PMT (merge re-done after a discontinuity, a failed
+     * attempt on another packet) must not add to the old entries */
+    pmt->component_num = 0;
+
     parse_ts_packet(bufp, &packed);
 
     if (packed.continuity != 0)
@@ -366,7 +371,7 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
     pmt->pmt_sectionlen = seclen + 3; // whole size of data
     if (pmt->pmt_sectionlen + (bufp - data) > TS_PACKET_LENGTH)
     {
-        MSG_ERROR("PMT section to long seclen: 0x%hhx\n", seclen);
+        MSG_ERROR("PMT section to long seclen: 0x%x\n", (unsigned int)seclen);
         return false;
     }
 
@@ -395,7 +400,7 @@ static bool parse_pmt(const uint8_t *data, pmt_data_t *pmt)
     bufp += 4;
     if (desclen + (bufp - ppmt) > pmt->pmt_sectionlen)
     {
-        MSG_ERROR("PMT section to long desclen: 0x%hhx\n", desclen);
+        MSG_ERROR("PMT section to long desclen: 0x%x\n", (unsigned int)desclen);
         return false;
     }
     // descriptor
@@ -571,7 +576,7 @@ static const uint8_t* get_dts_from_id3(const uint8_t *buf, uint32_t size, int64_
                 {
                     int64_t ts = (int64_t)ptr[0] << 56 | (int64_t)ptr[1] << 48 | (int64_t)ptr[2] << 40 | (int64_t)ptr[3] << 32 |
                                  (int64_t)ptr[4] << 24 | (int64_t)ptr[5] << 16 | (int64_t)ptr[6] << 8 | (int64_t)ptr[7];
-                    MSG_DBG("HLS ID3 audio timestamp %lld\n", ts);
+                    MSG_DBG("HLS ID3 audio timestamp %lld\n", (long long)ts);
                     if ((ts & ~((1ULL << 33) - 1)) == 0)
                     {
                         *dts = ts;
@@ -579,7 +584,7 @@ static const uint8_t* get_dts_from_id3(const uint8_t *buf, uint32_t size, int64_
                     }
                     else
                     {
-                        MSG_ERROR("Invalid HLS ID3 audio timestamp %lld\n", ts);
+                        MSG_ERROR("Invalid HLS ID3 audio timestamp %lld\n", (long long)ts);
                     }
                 }
             }
@@ -896,8 +901,9 @@ static size_t merge_with_raw_audio(merge_context_t *context, const uint8_t *pdat
         }
         else
         {
+            /* the caller writes the video alone */
             MSG_ERROR("RAW audio stream: codec not supported!\n");
-            exit(1);
+            return 0;
         }
         return do_merge_with_raw_audio(context, pdata1, size1, ptr, size2, dts, audiotype);
     }
@@ -1008,6 +1014,13 @@ static size_t merge_ts_packets(merge_context_t *context, const uint8_t *pdata1, 
         }
     }
     return ret;
+}
+
+void merge_context_reset(merge_context_t *context)
+{
+    write_ctx_t *out = context->out;
+    memset(context, 0x00, sizeof(*context));
+    context->out = out;
 }
 
 size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2)
