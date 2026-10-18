@@ -73,9 +73,16 @@ docker run -v ./data:/var/hlsdl/data --rm -it hlsdl:latest hlsdl [options] url
 
 Output keeps the original container format. Use `-o video.mp4` for fragmented MP4.
 Combining fragmented MP4 segments across discontinuities or initialization data changes is not supported.
-Separate audio and SAMPLE-AES are unsupported for playlists using `EXT-X-MAP`.
+SAMPLE-AES is unsupported for playlists using `EXT-X-MAP`.
+
+A separate audio rendition (`EXT-X-MEDIA`, or `-a`) is merged into the output, for VOD and live streams:
+MPEG-TS and packed audio into the TS packets, fragmented MP4 audio as a second track of the fragmented MP4
+output (video and audio playlist both need `EXT-X-MAP`).
 
 Use `-I` to skip failed VOD segment downloads after retries. The output will be incomplete.
+
+Use `-R -o video.ts` to resume an interrupted VOD download. The progress is kept in
+`video.ts.hlsdl.resume` and removed once the download is complete.
 
 Use `-m -o video.ts` to save `000_video.ts`, `001_video.ts`, and so on.
 Each fragmented MP4 file includes its initialization data.
@@ -88,7 +95,7 @@ Each fragmented MP4 file includes its initialization data.
 
 -H ... Choose largest height lower or equal than this.
 
--A ... Select audio language.
+-A ... Select audio language (else the DEFAULT rendition, else the first).
 
 -v ... Verbose more information.
 
@@ -108,17 +115,19 @@ Each fragmented MP4 file includes its initialization data.
 
 -f ... Force overwriting the output file.
 
+-R ... Resume an interrupted VOD download (keeps a <output>.hlsdl.resume sidecar; not with -m).
+
 -F ... Force ignore detection of DRM.
 
 -K ... Force AES key value (hexstring)
 
--q ... Print less to the console.
+-q ... Print less to the console (status lines, errors and warnings; -qq: nothing).
 
 -d ... Print the openssl decryption command.
 
 -t ... Print the links to the .ts files.
 
--s ... Set live start offset in seconds.
+-s ... Set live start offset in seconds (at least three target durations).
 
 -i ... Set live stream download duration in seconds.
 
@@ -128,9 +137,9 @@ Each fragmented MP4 file includes its initialization data.
 
 -w ... Set max download segment retries.
 
--I ... Skip failed VOD segment downloads after retries.
+-I ... Skip VOD segments that still fail after the retries (the output has gaps; not with -R).
 
--a ... Set additional url to the audio media playlist.
+-a ... Set additional url to the audio media playlist (VOD and live; TS, or fMP4 with init segments).
 
 -c ... Treat HTTP code 206 as 200 even if request was made without range header.
 
@@ -139,7 +148,7 @@ Each fragmented MP4 file includes its initialization data.
 
 ToDo
 -----
-* remux fragmented MP4 discontinuities and separate audio renditions
+* remux fragmented MP4 discontinuities
 
 Ideas
 -----

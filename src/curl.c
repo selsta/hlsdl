@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <errno.h>
 #include <pthread.h>
 #include <curl/curl.h>
@@ -39,37 +40,57 @@ void * set_timeout_session(void *ptr_session, const long speed_limit, const long
     return session;
 }
 
+/* first allocation when the server sends no Content-Length (chunked live
+ * segments, compressed playlists) */
+#define RECV_BUF_MIN (64 * 1024)
+/* connecting gets this long; curl's own default is 300 s, which with the
+ * segment retries left a dead CDN hanging the download for a long time */
+#define CONNECT_TIMEOUT_SEC 15L
+
 static size_t
 WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
 
+    /* mem->reserved = bytes allocated, the NUL terminator included */
     if (mem->reserved == 0)
     {
         CURLcode res;
         double filesize = 0.0;
 
         res = curl_easy_getinfo(mem->c, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &filesize);
-        if((CURLE_OK == res) && (filesize>0.0))
+        /* more than a segment can hold (INT_MAX, see hls.c) is not trusted */
+        if ((CURLE_OK == res) && (filesize > 0.0) && (filesize < (double)INT_MAX))
         {
-            mem->memory = realloc(mem->memory, (int)filesize + 2);
-            if (mem->memory == NULL) {
+            size_t want = (size_t)filesize + 1;
+            char *tmp = realloc(mem->memory, want);
+            if (tmp == NULL) {
                 MSG_ERROR("not enough memory (realloc returned NULL)\n");
                 return 0;
             }
-            mem->reserved = (int)filesize + 1;
+            mem->memory = tmp;
+            mem->reserved = want;
         }
     }
 
     if ((mem->size + realsize + 1) > mem->reserved)
     {
-        mem->memory = realloc(mem->memory, mem->size + realsize + 1);
-        mem->reserved = mem->size + realsize + 1;
-        if (mem->memory == NULL) {
+        /* Grow geometrically: without a Content-Length (or with the smaller
+         * compressed one) every chunk curl hands over would otherwise mean a
+         * realloc and, often, a copy of everything received so far. */
+        size_t need = mem->size + realsize + 1;
+        size_t want = mem->reserved < RECV_BUF_MIN ? RECV_BUF_MIN : mem->reserved * 2;
+        if (want < need) {
+            want = need;
+        }
+        char *tmp = realloc(mem->memory, want);
+        if (tmp == NULL) {
             MSG_ERROR("not enough memory (realloc returned NULL)\n");
             return 0;
         }
+        mem->memory = tmp;
+        mem->reserved = want;
     }
 
     memcpy(&(mem->memory[mem->size]), contents, realsize);
@@ -79,13 +100,18 @@ WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
     return realsize;
 }
 
+/* NULL when no memory or no curl handle could be had */
 void * init_http_session(void)
 {
-    struct http_session *session = malloc(sizeof(struct http_session));
-    CURL *c;
-    memset(session, 0x00, sizeof(struct http_session));
-    c = curl_easy_init();
-    session->handle = c;
+    struct http_session *session = calloc(1, sizeof(struct http_session));
+    if (!session) {
+        return NULL;
+    }
+    session->handle = curl_easy_init();
+    if (!session->handle) {
+        free(session);
+        return NULL;
+    }
     return session;
 }
 
@@ -176,8 +202,19 @@ size_t get_data_from_localfile(char* filename, char** out, int64_t range_offset,
             readsize = range_size;
         }
 
-        *out = (char*)malloc(sizeof(char) * readsize + 1);
-        if (fread(*out, 1, readsize, fp) != readsize) {
+        if (readsize < 0) {
+            MSG_ERROR("cannot determine the size of %s\n", filename);
+            fclose(fp);
+            return -1;
+        }
+
+        *out = (char*)malloc((size_t)readsize + 1);
+        if (*out == NULL) {
+            MSG_ERROR("out of memory\n");
+            fclose(fp);
+            return -1;
+        }
+        if (fread(*out, 1, (size_t)readsize, fp) != (size_t)readsize) {
             MSG_ERROR("fread returned less bytes than required\n");
             free(*out);
             *out = NULL;
@@ -230,6 +267,7 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
     chunk.reserved = 0;
     chunk.c = c;
 
+    /* two full int64 values: "-9223372036854775808-9223372036854775807" */
     char range_buff[42];
     char* range = NULL;
     if (range_size > -1) {
@@ -251,10 +289,14 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, session->speed_time);
     }
 
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, CONNECT_TIMEOUT_SEC);
     curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);
     /* curl_easy_setopt(c, CURLOPT_FRESH_CONNECT, 1);*/
-    /* enable all supported built-in compressions */
-    curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, "");
+    /* Compression only for playlists: segments and keys are binary (nothing
+     * to gain), and a Range request answered with a compressed body would
+     * apply the range to the compressed bytes. NULL switches it off again on
+     * a reused handle. */
+    curl_easy_setopt(c, CURLOPT_ACCEPT_ENCODING, type == STRING ? "" : NULL);
 
     if (session->user_agent) {
         curl_easy_setopt(c, CURLOPT_USERAGENT, session->user_agent);
@@ -293,26 +335,29 @@ long get_data_from_url_with_session(void **ptr_session, char *url, char **out, s
 
     if (res != CURLE_OK) {
         MSG_ERROR("curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        /* a transfer that broke off after a 206 is just as incomplete */
         if (http_code == 200 || http_code == 206) {
-            http_code = -res;
+            http_code = -(long)res;
         }
     } else {
-        if (type == STRING) {
-            *out = strdup(chunk.memory);
+        if (type == STRING || type == BINARY) {
+            /* Hand the (always NUL-terminated) receive buffer over instead of
+             * copying it - a segment would otherwise sit in memory twice. An
+             * image in front of the segment data (e.g. the 1x1 PNG described
+             * at https://laurentmeyer.medium.com/deep-dive-in-the-illegal-streaming-world-cd11fae63497)
+             * is cut off in hls.c (strip_disguise_prefix), which checks for the
+             * TS data behind it - not here. */
+            *out = chunk.memory;
+            chunk.memory = NULL;
         } else if (type == BINKEY) {
+            /* a short key response must not be read as 16 bytes; the caller
+             * rejects the size */
             *out = NULL;
             if (chunk.size == KEYLEN) {
                 *out = malloc(KEYLEN);
-                *out = memcpy(*out, chunk.memory, KEYLEN);
-            }
-        } else if (type == BINARY) {
-            *out = malloc(chunk.size);
-            // hack to remove 1x1 png as seen e.g. here:
-            // https://laurentmeyer.medium.com/deep-dive-in-the-illegal-streaming-world-cd11fae63497
-            if (chunk.size > 16 && (chunk.memory[0] == 0x89 && chunk.memory[1] == 0x50 && chunk.memory[2] == 0x4E)) {
-                *out = memcpy(*out, chunk.memory + 16, chunk.size);
-            } else {
-                *out = memcpy(*out, chunk.memory, chunk.size);
+                if (*out) {
+                    memcpy(*out, chunk.memory, KEYLEN);
+                }
             }
         }
     }

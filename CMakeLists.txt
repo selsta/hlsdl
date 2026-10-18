@@ -34,7 +34,7 @@ else()
         message(FATAL_ERROR "hlsdl requires POSIX threads")
     endif()
     target_link_libraries(hlsdl PRIVATE Threads::Threads)
-    target_compile_definitions(hlsdl PRIVATE _GNU_SOURCE=1)
+    target_compile_definitions(hlsdl PRIVATE _GNU_SOURCE=1 _FILE_OFFSET_BITS=64)
     target_compile_options(hlsdl PRIVATE
         -Wall -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
         -Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare

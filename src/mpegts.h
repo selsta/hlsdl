@@ -91,6 +91,10 @@ typedef struct merge_context_s {
 
 bool parse_ts_packet(const uint8_t *data, ts_packet_t *packed);
 size_t merge_packets(merge_context_t *context, const uint8_t *pdata1, uint32_t size1, const uint8_t *pdata2, uint32_t size2);
+/* Forget the merged PMT (keeps the output): the next merge_packets() works it
+ * out again from the segments it gets - after a discontinuity, where PIDs and
+ * PMT may change. */
+void merge_context_reset(merge_context_t *context);
 bool find_pmt(const uint8_t *bufp, uint32_t size, pmt_data_t *pmt);
 void pmt_update_crc(pmt_data_t *pmt);
 
